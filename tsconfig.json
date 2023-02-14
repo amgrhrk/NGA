@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"target": "ES2019",
+		"strict": true,
+		"alwaysStrict": false,
+		"outFile": "NGA.user.js"
+	},
+	"files": [
+		"src/meta.ts",
+		"src/ui.ts",
+		"src/utils.ts",
+		"src/index.ts"
+	]
+}
