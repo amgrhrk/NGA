@@ -44,45 +44,47 @@ class Popup {
 	constructor(config: Config) {
 		this.config = config
 		this.container = Popup.template.content.firstElementChild!.cloneNode(true) as HTMLDivElement
-		this.textAreas = [...this.container.querySelectorAll('textarea')] as any
+		this.textAreas = [...this.container.querySelectorAll('textarea')] as [HTMLTextAreaElement, HTMLTextAreaElement]
 		this.reset()
 		const [confirmButton, cancelButton] = this.container.querySelectorAll('button')
 		confirmButton.addEventListener('click', () => {
 			this.config.userBlockList = new Set(this.textAreas[0].value
-				.split(',')
+				.split('\n')
 				.map(user => parseInt(user.trim(), 10))
 				.filter(user => !Number.isNaN(user))
 			)
 			this.config.subBlockList = new Set(this.textAreas[1].value
-				.split(',')
+				.split('\n')
 				.map(sub => sub.trim())
 				.filter(sub => sub !== '')
 			)
 			this.config.save()
-			this.reset()
 			this.hide()
 		})
 		cancelButton.addEventListener('click', () => {
-			this.reset()
 			this.hide()
 		})
 		document.body.appendChild(this.container)
 	}
 
 	show() {
+		this.reset()
 		this.container.style.display = 'flex'
 	}
 
 	hide() {
+		this.reset()
 		this.container.style.display = 'none'
 	}
 
 	private reset() {
-		this.textAreas[0].value = [...this.config.userBlockList].join(', ')
-		this.textAreas[1].value = [...this.config.subBlockList].join(', ')
+		this.textAreas[0].value = [...this.config.userBlockList].join('\n')
+		this.textAreas[1].value = [...this.config.subBlockList].join('\n')
 	}
 }
 
+// border: 1px solid #dddddd;
+// box-shadow: 0 2px 8px #dddddd;
 GM_addStyle(`
 	#NGA-config-menu {
 		background-color: #e1efeb;
@@ -93,8 +95,14 @@ GM_addStyle(`
 		left: 50%;
 		transform: translate(-50%, -50%);
 		flex-direction: column;
-		border: 1px solid #dddddd;
-		box-shadow: 0 2px 8px #dddddd;
+		border: 1px solid #d3dedb;
+		box-shadow: 0 0 5px -3px black;
+		box-sizing: border-box;
+	}
+
+	#NGA-config-menu > textarea {
+		width: 20rem;
+		height: 10rem;
 	}
 
 	#NGA-config-menu > div:nth-last-of-type(1) {

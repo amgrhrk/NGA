@@ -85,8 +85,22 @@ function processThreads(config: Config) {
 		if (title) {
 			title.innerText = translate(title.innerText)
 		}
+		addBlockButton(thread, url, uid, config)
 	}
 	return true
+}
+
+function addBlockButton(thread: HTMLElement, url: HTMLAnchorElement, uid: number, config: Config) {
+	const button = document.createElement('a')
+	button.href = 'javascript:void(0)'
+	button.innerText = '屏蔽'
+	button.style.marginLeft = '8px'
+	button.addEventListener('click', () => {
+		thread.style.display = 'none'
+		config.userBlockList.add(uid)
+		config.save()
+	})
+	url.insertAdjacentElement('afterend', button)
 }
 
 function processPosts(config: Config) {
