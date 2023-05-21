@@ -52,16 +52,25 @@ namespace addClickEventListener {
 	}
 }
 
-function loadImages() {
+function loadImages(config: Config, imageSet: Set<HTMLImageElement>) {
 	const images = document.querySelectorAll<HTMLImageElement>('.postcontent img')
 	for (const image of images) {
+		imageSet.add(image)
+		let modified = false
 		if (image.dataset.srcorg) {
 			image.src = image.dataset.srcorg
+			modified = true
 		} else if (image.dataset.srclazy) {
 			image.src = image.dataset.srclazy
+			modified = true
 		}
 		delete image.dataset.srclazy
 		delete image.dataset.srcorg
+		if (!config.showOriginalImage && modified) {
+			image.src = image.src + '.thumb.jpg'
+			image.removeAttribute('style')
+			image.style.maxWidth = '200px'
+		}
 	}
 }
 
@@ -106,7 +115,8 @@ function addBlockButton(thread: HTMLElement, url: HTMLAnchorElement, uid: number
 function processPosts(config: Config) {
 	const posts = document.querySelectorAll<HTMLTableElement>('table.forumbox.postbox')
 	for (const post of posts) {
-		const uid = parseInt(post.querySelector<HTMLAnchorElement>('a[name=uid]')!.innerText)
+		const uidElement = post.querySelector<HTMLAnchorElement>('a[name=uid]')!
+		const uid = parseInt(uidElement.innerText)
 		if (config.userBlockList.has(uid)) {
 			post.style.display = 'none'
 			continue
@@ -123,29 +133,47 @@ function processPosts(config: Config) {
 				}
 			}, { once: true })
 		}
-		if (quote) {
-			const qUser = quote.querySelector<HTMLAnchorElement>('a.b')
-			if (qUser) {
-				const match = qUser.href.match(/uid=(.+$)/)
-				if (match) {
-					const qUid = parseInt(match[1])
-					if (config.userBlockList.has(qUid)) {
-						quote.style.display = 'none'
-						continue
+		processQuote(config, quote)
+		addBlockButtonForPost(config, post, uidElement, uid)
+	}
+	return true
+}
+
+function processQuote(config: Config, quote: HTMLElement | null) {
+	if (!quote) {
+		return
+	}
+	const qUser = quote.querySelector<HTMLAnchorElement>('a.b')
+	if (qUser) {
+		const match = qUser.href.match(/uid=(.+$)/)
+		if (match) {
+			const qUid = parseInt(match[1])
+			if (config.userBlockList.has(qUid)) {
+				quote.style.display = 'none'
+				return
+			}
+			translateChildTextNodes(quote)
+			const collapseButton = quote.querySelector('button[name=collapseSwitchButton]')
+			if (collapseButton) {
+				collapseButton.addEventListener('click', () => {
+					const collapseContent = quote.querySelector('.collapse_content')
+					if (collapseContent) {
+						translateChildTextNodes(collapseContent)
 					}
-					translateChildTextNodes(quote)
-					const collapseButton = quote.querySelector('button[name=collapseSwitchButton]')
-					if (collapseButton) {
-						collapseButton.addEventListener('click', () => {
-							const collapseContent = quote.querySelector('.collapse_content')
-							if (collapseContent) {
-								translateChildTextNodes(collapseContent)
-							}
-						}, { once: true })
-					}
-				}
+				}, { once: true })
 			}
 		}
 	}
-	return true
+}
+
+function addBlockButtonForPost(config: Config, post: HTMLTableElement, uidElement: HTMLAnchorElement, uid: number) {
+	const button = document.createElement('a')
+	button.href = 'javascript:void(0)'
+	button.innerText = '屏蔽'
+	button.addEventListener('click', () => {
+		post.style.display = 'none'
+		config.userBlockList.add(uid)
+		config.save()
+	})
+	uidElement.insertAdjacentElement('afterend', button)
 }

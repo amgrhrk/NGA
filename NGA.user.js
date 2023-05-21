@@ -12,6 +12,7 @@
 // @grant        GM_getValue
 // @grant        GM_addStyle
 // @require      https://cdn.jsdelivr.net/gh/amgrhrk/NGA/src/translate.js
+// @run-at       document-end
 // ==/UserScript==
 const scriptName = 'NGA屏蔽用户';
 function log(...data) {
@@ -22,11 +23,13 @@ class Config {
         const config = (GM_getValue(scriptName) || {});
         this.userBlockList = config.userBlockList ? new Set(config.userBlockList) : new Set();
         this.subBlockList = config.subBlockList ? new Set(config.subBlockList) : new Set();
+        this.showOriginalImage = config.showOriginalImage === true ? true : false;
     }
     save() {
         const config = {};
         config.userBlockList = [...this.userBlockList];
         config.subBlockList = [...this.subBlockList];
+        config.showOriginalImage = this.showOriginalImage;
         GM_setValue(scriptName, config);
     }
 }
@@ -35,6 +38,7 @@ class Popup {
         this.config = config;
         this.container = Popup.template.content.firstElementChild.cloneNode(true);
         this.textAreas = [...this.container.querySelectorAll('textarea')];
+        this.checkbox = this.container.querySelector('input[type=checkbox]');
         this.reset();
         const [confirmButton, cancelButton] = this.container.querySelectorAll('button');
         confirmButton.addEventListener('click', () => {
@@ -46,6 +50,7 @@ class Popup {
                 .split('\n')
                 .map(sub => sub.trim())
                 .filter(sub => sub !== ''));
+            this.config.showOriginalImage = this.checkbox.checked;
             this.config.save();
             this.hide();
         });
@@ -65,6 +70,7 @@ class Popup {
     reset() {
         this.textAreas[0].value = [...this.config.userBlockList].join('\n');
         this.textAreas[1].value = [...this.config.subBlockList].join('\n');
+        this.checkbox.checked = this.config.showOriginalImage;
     }
 }
 Popup.template = (() => {
@@ -74,6 +80,9 @@ Popup.template = (() => {
         + `	<textarea></textarea>\n`
         + `	<div>版块黑名单</div>\n`
         + `	<textarea></textarea>\n`
+        + `	<div>\n`
+        + `		<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>\n`
+        + `	</div>\n`
         + `	<div>\n`
         + `		<button>确定</button>\n`
         + `		<button>取消</button>\n`
@@ -194,17 +203,26 @@ function addClickEventListener(element, handler) {
     }
     addClickEventListener.toThreads = toThreads;
 })(addClickEventListener || (addClickEventListener = {}));
-function loadImages() {
+function loadImages(config, imageSet) {
     const images = document.querySelectorAll('.postcontent img');
     for (const image of images) {
+        imageSet.add(image);
+        let modified = false;
         if (image.dataset.srcorg) {
             image.src = image.dataset.srcorg;
+            modified = true;
         }
         else if (image.dataset.srclazy) {
             image.src = image.dataset.srclazy;
+            modified = true;
         }
         delete image.dataset.srclazy;
         delete image.dataset.srcorg;
+        if (!config.showOriginalImage && modified) {
+            image.src = image.src + '.thumb.jpg';
+            image.removeAttribute('style');
+            image.style.maxWidth = '200px';
+        }
     }
 }
 function processThreads(config) {
@@ -246,7 +264,8 @@ function addBlockButton(thread, url, uid, config) {
 function processPosts(config) {
     const posts = document.querySelectorAll('table.forumbox.postbox');
     for (const post of posts) {
-        const uid = parseInt(post.querySelector('a[name=uid]').innerText);
+        const uidElement = post.querySelector('a[name=uid]');
+        const uid = parseInt(uidElement.innerText);
         if (config.userBlockList.has(uid)) {
             post.style.display = 'none';
             continue;
@@ -263,31 +282,47 @@ function processPosts(config) {
                 }
             }, { once: true });
         }
-        if (quote) {
-            const qUser = quote.querySelector('a.b');
-            if (qUser) {
-                const match = qUser.href.match(/uid=(.+$)/);
-                if (match) {
-                    const qUid = parseInt(match[1]);
-                    if (config.userBlockList.has(qUid)) {
-                        quote.style.display = 'none';
-                        continue;
+        processQuote(config, quote);
+        addBlockButtonForPost(config, post, uidElement, uid);
+    }
+    return true;
+}
+function processQuote(config, quote) {
+    if (!quote) {
+        return;
+    }
+    const qUser = quote.querySelector('a.b');
+    if (qUser) {
+        const match = qUser.href.match(/uid=(.+$)/);
+        if (match) {
+            const qUid = parseInt(match[1]);
+            if (config.userBlockList.has(qUid)) {
+                quote.style.display = 'none';
+                return;
+            }
+            translateChildTextNodes(quote);
+            const collapseButton = quote.querySelector('button[name=collapseSwitchButton]');
+            if (collapseButton) {
+                collapseButton.addEventListener('click', () => {
+                    const collapseContent = quote.querySelector('.collapse_content');
+                    if (collapseContent) {
+                        translateChildTextNodes(collapseContent);
                     }
-                    translateChildTextNodes(quote);
-                    const collapseButton = quote.querySelector('button[name=collapseSwitchButton]');
-                    if (collapseButton) {
-                        collapseButton.addEventListener('click', () => {
-                            const collapseContent = quote.querySelector('.collapse_content');
-                            if (collapseContent) {
-                                translateChildTextNodes(collapseContent);
-                            }
-                        }, { once: true });
-                    }
-                }
+                }, { once: true });
             }
         }
     }
-    return true;
+}
+function addBlockButtonForPost(config, post, uidElement, uid) {
+    const button = document.createElement('a');
+    button.href = 'javascript:void(0)';
+    button.innerText = '屏蔽';
+    button.addEventListener('click', () => {
+        post.style.display = 'none';
+        config.userBlockList.add(uid);
+        config.save();
+    });
+    uidElement.insertAdjacentElement('afterend', button);
 }
 const config = new Config();
 const injectScript = (() => {
@@ -298,6 +333,16 @@ const injectScript = (() => {
             popup.show();
         })
     ];
+    const images = new Set();
+    const observer = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+            const image = mutation.target;
+            if (!images.has(image) || mutation.attributeName !== 'style') {
+                return;
+            }
+            image.style.maxWidth = '200px';
+        }
+    });
     return () => {
         if (prevNav === document.getElementById('pagebtop')) {
             setTimeout(injectScript, 0);
@@ -309,9 +354,10 @@ const injectScript = (() => {
         addClickEventListener.toPageNavigation(injectScript);
         addClickEventListener.toThreads(injectScript);
         if (!processThreads(config)) {
-            loadImages();
+            loadImages(config, images);
             processPosts(config);
         }
+        observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true });
     };
 })();
 injectScript();

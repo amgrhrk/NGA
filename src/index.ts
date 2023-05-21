@@ -8,6 +8,16 @@ const injectScript = (() => {
 			popup.show()
 		})
 	] as const
+	const images = new Set<HTMLImageElement>()
+	const observer = new MutationObserver(mutations => {
+		for (const mutation of mutations) {
+			const image = mutation.target as HTMLImageElement
+			if (!images.has(image) || mutation.attributeName !== 'style') {
+				return
+			}
+			image.style.maxWidth = '200px'
+		}
+	})
 	return () => {
 		if (prevNav === document.getElementById('pagebtop')) {
 			setTimeout(injectScript, 0)
@@ -19,9 +29,10 @@ const injectScript = (() => {
 		addClickEventListener.toPageNavigation(injectScript)
 		addClickEventListener.toThreads(injectScript)
 		if (!processThreads(config)) {
-			loadImages()
+			loadImages(config, images)
 			processPosts(config)
 		}
+		observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true })
 	}
 })()
 

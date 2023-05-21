@@ -1,22 +1,26 @@
 interface GMConfig {
 	userBlockList?: number[]
 	subBlockList?: string[]
+	showOriginalImage?: boolean
 }
 
 class Config {
 	userBlockList: Set<number>
 	subBlockList: Set<string>
+	showOriginalImage: boolean
 
 	constructor() {
 		const config = (GM_getValue(scriptName) || {}) as GMConfig
 		this.userBlockList = config.userBlockList ? new Set(config.userBlockList) : new Set()
 		this.subBlockList = config.subBlockList ? new Set(config.subBlockList) : new Set()
+		this.showOriginalImage = config.showOriginalImage === true ? true : false
 	}
 
 	save() {
 		const config = {} as GMConfig
 		config.userBlockList = [...this.userBlockList]
 		config.subBlockList = [...this.subBlockList]
+		config.showOriginalImage = this.showOriginalImage
 		GM_setValue(scriptName, config)
 	}
 }
@@ -25,6 +29,7 @@ class Popup {
 	private config: Config
 	container: HTMLDivElement
 	textAreas: readonly [HTMLTextAreaElement, HTMLTextAreaElement]
+	checkbox: HTMLInputElement
 
 	private static template = (() => {
 		const template = document.createElement('template')
@@ -33,6 +38,9 @@ class Popup {
 			+ `	<textarea></textarea>\n`
 			+ `	<div>版块黑名单</div>\n`
 			+ `	<textarea></textarea>\n`
+			+ `	<div>\n`
+			+ `		<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>\n`
+			+ `	</div>\n`
 			+ `	<div>\n`
 			+ `		<button>确定</button>\n`
 			+ `		<button>取消</button>\n`
@@ -45,6 +53,7 @@ class Popup {
 		this.config = config
 		this.container = Popup.template.content.firstElementChild!.cloneNode(true) as HTMLDivElement
 		this.textAreas = [...this.container.querySelectorAll('textarea')] as [HTMLTextAreaElement, HTMLTextAreaElement]
+		this.checkbox = this.container.querySelector('input[type=checkbox]')!
 		this.reset()
 		const [confirmButton, cancelButton] = this.container.querySelectorAll('button')
 		confirmButton.addEventListener('click', () => {
@@ -58,6 +67,7 @@ class Popup {
 				.map(sub => sub.trim())
 				.filter(sub => sub !== '')
 			)
+			this.config.showOriginalImage = this.checkbox.checked
 			this.config.save()
 			this.hide()
 		})
@@ -80,6 +90,7 @@ class Popup {
 	private reset() {
 		this.textAreas[0].value = [...this.config.userBlockList].join('\n')
 		this.textAreas[1].value = [...this.config.subBlockList].join('\n')
+		this.checkbox.checked = this.config.showOriginalImage
 	}
 }
 
