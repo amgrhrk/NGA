@@ -135,28 +135,28 @@ class MenuItem {
 	}
 
 	private navButtonOnClickHandler() {
-		const startMenu = document.querySelector('#startmenu')!
-		const settingsButton = startMenu.querySelector('a[title=设置]')
-		settingsButton?.addEventListener('click', () => this.append())
+		const settingsButton = document.querySelector('a[title=设置]')
+		settingsButton?.addEventListener('click', () => {
+			this.append()
+		})
 	}
 
-	append() {
-		if (document.getElementById('NGA-settings-item')) {
+	private append() {
+		const vanillaSettingsItem = document.querySelector('#startmenu .item > a[title="设置 - 提交debug信息"]')
+		if (!vanillaSettingsItem) {
 			return
 		}
-		const startMenu = document.querySelector('#startmenu')
-		if (!startMenu) {
-			const navButtons = document.querySelectorAll('#mainmenu .right > .td > a')
-			const startButton = navButtons[0]
-			const messageButton = navButtons[3]
-			for (const button of [startButton, messageButton]) {
-				button.addEventListener('click', () => this.navButtonOnClickHandler())
-			}
-			return
-		}
-		const subMenu = startMenu.querySelector('.last > div')!
 		const menuItem = this.template.content.firstElementChild!.cloneNode(true) as HTMLDivElement
 		menuItem.firstElementChild!.addEventListener('click', this.clickHandler)
-		subMenu.insertAdjacentElement('beforeend', menuItem)
+		vanillaSettingsItem.parentElement!.insertAdjacentElement('afterend', menuItem)
+	}
+
+	init() {
+		const navButtons = document.querySelectorAll('#mainmenu .right > .td > a')
+		const startButton = navButtons[0]
+		const messageButton = navButtons[3]
+		for (const button of [startButton, messageButton]) {
+			button.addEventListener('click', () => this.navButtonOnClickHandler())
+		}
 	}
 }

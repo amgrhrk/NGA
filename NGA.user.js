@@ -126,28 +126,27 @@ class MenuItem {
         this.clickHandler = onClick;
     }
     navButtonOnClickHandler() {
-        const startMenu = document.querySelector('#startmenu');
-        const settingsButton = startMenu.querySelector('a[title=设置]');
-        settingsButton === null || settingsButton === void 0 ? void 0 : settingsButton.addEventListener('click', () => this.append());
+        const settingsButton = document.querySelector('a[title=设置]');
+        settingsButton === null || settingsButton === void 0 ? void 0 : settingsButton.addEventListener('click', () => {
+            this.append();
+        });
     }
     append() {
-        if (document.getElementById('NGA-settings-item')) {
+        const vanillaSettingsItem = document.querySelector('#startmenu .item > a[title="设置 - 提交debug信息"]');
+        if (!vanillaSettingsItem) {
             return;
         }
-        const startMenu = document.querySelector('#startmenu');
-        if (!startMenu) {
-            const navButtons = document.querySelectorAll('#mainmenu .right > .td > a');
-            const startButton = navButtons[0];
-            const messageButton = navButtons[3];
-            for (const button of [startButton, messageButton]) {
-                button.addEventListener('click', () => this.navButtonOnClickHandler());
-            }
-            return;
-        }
-        const subMenu = startMenu.querySelector('.last > div');
         const menuItem = this.template.content.firstElementChild.cloneNode(true);
         menuItem.firstElementChild.addEventListener('click', this.clickHandler);
-        subMenu.insertAdjacentElement('beforeend', menuItem);
+        vanillaSettingsItem.parentElement.insertAdjacentElement('afterend', menuItem);
+    }
+    init() {
+        const navButtons = document.querySelectorAll('#mainmenu .right > .td > a');
+        const startButton = navButtons[0];
+        const messageButton = navButtons[3];
+        for (const button of [startButton, messageButton]) {
+            button.addEventListener('click', () => this.navButtonOnClickHandler());
+        }
     }
 }
 function translateChildTextNodes(node, exclude) {
@@ -349,7 +348,7 @@ const injectScript = (() => {
             return;
         }
         prevNav = document.getElementById('pagebtop');
-        menuItems.forEach(item => item.append());
+        menuItems.forEach(item => item.init());
         addClickEventListener.toBreadcrumb(injectScript);
         addClickEventListener.toPageNavigation(injectScript);
         addClickEventListener.toThreads(injectScript);
@@ -357,7 +356,9 @@ const injectScript = (() => {
             loadImages(config, images);
             processPosts(config);
         }
-        observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true });
+        if (!config.showOriginalImage) {
+            observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true });
+        }
     };
 })();
 injectScript();

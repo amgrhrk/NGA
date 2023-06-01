@@ -24,7 +24,7 @@ const injectScript = (() => {
 			return
 		}
 		prevNav = document.getElementById('pagebtop')
-		menuItems.forEach(item => item.append())
+		menuItems.forEach(item => item.init())
 		addClickEventListener.toBreadcrumb(injectScript)
 		addClickEventListener.toPageNavigation(injectScript)
 		addClickEventListener.toThreads(injectScript)
@@ -32,7 +32,9 @@ const injectScript = (() => {
 			loadImages(config, images)
 			processPosts(config)
 		}
-		observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true })
+		if (!config.showOriginalImage) {
+			observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true })
+		}
 	}
 })()
 
