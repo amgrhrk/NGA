@@ -12,18 +12,21 @@
 // @grant        GM_getValue
 // @grant        GM_addStyle
 // @require      https://cdn.jsdelivr.net/gh/amgrhrk/NGA/src/translate.js
-// @run-at       document-end
+// @run-at       document-body
 // ==/UserScript==
 const scriptName = 'NGA屏蔽用户';
 function log(...data) {
     console.log(`${scriptName}:`, ...data);
 }
+const html = String.raw;
+const css = String.raw;
 class Config {
     constructor() {
         const config = (GM_getValue(scriptName) || {});
         this.userBlockList = config.userBlockList ? new Set(config.userBlockList) : new Set();
         this.subBlockList = config.subBlockList ? new Set(config.subBlockList) : new Set();
         this.showOriginalImage = config.showOriginalImage === true ? true : false;
+        this.onSave = null;
     }
     save() {
         const config = {};
@@ -31,6 +34,9 @@ class Config {
         config.subBlockList = [...this.subBlockList];
         config.showOriginalImage = this.showOriginalImage;
         GM_setValue(scriptName, config);
+        if (this.onSave) {
+            this.onSave();
+        }
     }
 }
 class Popup {
@@ -75,24 +81,25 @@ class Popup {
 }
 Popup.template = (() => {
     const template = document.createElement('template');
-    template.innerHTML = `<div id="NGA-config-menu" style="display: none;">\n`
-        + `	<div>用户黑名单</div>\n`
-        + `	<textarea></textarea>\n`
-        + `	<div>版块黑名单</div>\n`
-        + `	<textarea></textarea>\n`
-        + `	<div>\n`
-        + `		<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>\n`
-        + `	</div>\n`
-        + `	<div>\n`
-        + `		<button>确定</button>\n`
-        + `		<button>取消</button>\n`
-        + `	</div>\n`
-        + `</div>`;
+    template.innerHTML = html `
+<div id="NGA-config-menu" style="display: none;">
+	<div>用户黑名单</div>
+	<textarea></textarea>
+	<div>版块黑名单</div>
+	<textarea></textarea>
+	<div>
+		<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>
+	</div>
+	<div>
+		<button>确定</button>
+		<button>取消</button>
+	</div>
+</div>`.trim();
     return template;
 })();
 // border: 1px solid #dddddd;
 // box-shadow: 0 2px 8px #dddddd;
-GM_addStyle(`
+GM_addStyle(css `
 	#NGA-config-menu {
 		background-color: #e1efeb;
 		padding: 1rem;
@@ -120,10 +127,12 @@ GM_addStyle(`
 class MenuItem {
     constructor(id, title, text, onClick) {
         this.template = document.createElement('template');
-        this.template.innerHTML = `<div id="${id}" class="item">\n`
-            + `	<a href="javascript:void(0)" title="${title}" style="white-space: nowrap;">${text}</a>\n`
-            + `</div>`;
+        this.template.innerHTML = html `
+<div id="${id}" class="item">
+	<a href="javascript:void(0)" title="${title}" style="white-space: nowrap;">${text}</a>
+</div>`.trim();
         this.clickHandler = onClick;
+        this.initialized = false;
     }
     navButtonOnClickHandler() {
         const settingsButton = document.querySelector('a[title=设置]');
@@ -141,12 +150,16 @@ class MenuItem {
         vanillaSettingsItem.parentElement.insertAdjacentElement('afterend', menuItem);
     }
     init() {
+        if (this.initialized) {
+            return;
+        }
         const navButtons = document.querySelectorAll('#mainmenu .right > .td > a');
         const startButton = navButtons[0];
         const messageButton = navButtons[3];
         for (const button of [startButton, messageButton]) {
             button.addEventListener('click', () => this.navButtonOnClickHandler());
         }
+        this.initialized = true;
     }
 }
 function translateChildTextNodes(node, exclude) {
@@ -205,6 +218,10 @@ function addClickEventListener(element, handler) {
 function loadImages(config, imageSet) {
     const images = document.querySelectorAll('.postcontent img');
     for (const image of images) {
+        if (image.style.display === 'none') {
+            image.remove();
+            continue;
+        }
         imageSet.add(image);
         let modified = false;
         if (image.dataset.srcorg) {
@@ -221,6 +238,12 @@ function loadImages(config, imageSet) {
             image.src = image.src + '.thumb.jpg';
             image.removeAttribute('style');
             image.style.maxWidth = '200px';
+        }
+        if (document.title.includes('安科')) {
+            image.removeAttribute('style');
+            image.addEventListener('load', () => {
+                image.style.maxWidth = '300px';
+            });
         }
     }
 }
@@ -323,10 +346,31 @@ function addBlockButtonForPost(config, post, uidElement, uid) {
     });
     uidElement.insertAdjacentElement('afterend', button);
 }
+async function waitForElement(predicate) {
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver(mutations => {
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType !== Node.ELEMENT_NODE) {
+                        continue;
+                    }
+                    const element = node;
+                    if (predicate(element)) {
+                        resolve(element);
+                        observer.disconnect();
+                        return;
+                    }
+                }
+            }
+        });
+        observer.observe(document.body, { attributes: true, childList: true, subtree: true });
+    });
+}
 const config = new Config();
 const injectScript = (() => {
     let prevNav = null;
     const popup = new Popup(config);
+    config.onSave = () => popup.reset();
     const menuItems = [
         new MenuItem('NGA-settings-item', '设置 - 扩展设置', '扩展设置', () => {
             popup.show();
@@ -351,7 +395,10 @@ const injectScript = (() => {
         menuItems.forEach(item => item.init());
         addClickEventListener.toBreadcrumb(injectScript);
         addClickEventListener.toPageNavigation(injectScript);
-        addClickEventListener.toThreads(injectScript);
+        addClickEventListener.toThreads(async () => {
+            await waitForElement(element => element instanceof HTMLAnchorElement && element.name === 'uid');
+            injectScript();
+        });
         if (!processThreads(config)) {
             loadImages(config, images);
             processPosts(config);
@@ -361,4 +408,7 @@ const injectScript = (() => {
         }
     };
 })();
-injectScript();
+(async function start() {
+    await waitForElement(element => element.id === 'footer');
+    injectScript();
+})();

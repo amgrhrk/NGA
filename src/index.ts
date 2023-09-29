@@ -3,6 +3,7 @@ const config = new Config()
 const injectScript = (() => {
 	let prevNav: HTMLElement | null = null
 	const popup = new Popup(config)
+	config.onSave = () => popup.reset()
 	const menuItems = [
 		new MenuItem('NGA-settings-item', '设置 - 扩展设置', '扩展设置', () => {
 			popup.show()
@@ -27,7 +28,10 @@ const injectScript = (() => {
 		menuItems.forEach(item => item.init())
 		addClickEventListener.toBreadcrumb(injectScript)
 		addClickEventListener.toPageNavigation(injectScript)
-		addClickEventListener.toThreads(injectScript)
+		addClickEventListener.toThreads(async () => {
+			await waitForElement(element => element instanceof HTMLAnchorElement && element.name === 'uid')
+			injectScript()
+		})
 		if (!processThreads(config)) {
 			loadImages(config, images)
 			processPosts(config)
@@ -38,4 +42,7 @@ const injectScript = (() => {
 	}
 })()
 
-injectScript()
+;(async function start() {
+	await waitForElement(element => element.id === 'footer')
+	injectScript()
+})()

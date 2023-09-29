@@ -4,16 +4,21 @@ interface GMConfig {
 	showOriginalImage?: boolean
 }
 
+const html = String.raw
+const css = String.raw
+
 class Config {
 	userBlockList: Set<number>
 	subBlockList: Set<string>
 	showOriginalImage: boolean
+	onSave: (() => void) | null
 
 	constructor() {
 		const config = (GM_getValue(scriptName) || {}) as GMConfig
 		this.userBlockList = config.userBlockList ? new Set(config.userBlockList) : new Set()
 		this.subBlockList = config.subBlockList ? new Set(config.subBlockList) : new Set()
 		this.showOriginalImage = config.showOriginalImage === true ? true : false
+		this.onSave = null
 	}
 
 	save() {
@@ -22,6 +27,9 @@ class Config {
 		config.subBlockList = [...this.subBlockList]
 		config.showOriginalImage = this.showOriginalImage
 		GM_setValue(scriptName, config)
+		if (this.onSave) {
+			this.onSave()
+		}
 	}
 }
 
@@ -33,19 +41,20 @@ class Popup {
 
 	private static template = (() => {
 		const template = document.createElement('template')
-		template.innerHTML = `<div id="NGA-config-menu" style="display: none;">\n`
-			+ `	<div>用户黑名单</div>\n`
-			+ `	<textarea></textarea>\n`
-			+ `	<div>版块黑名单</div>\n`
-			+ `	<textarea></textarea>\n`
-			+ `	<div>\n`
-			+ `		<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>\n`
-			+ `	</div>\n`
-			+ `	<div>\n`
-			+ `		<button>确定</button>\n`
-			+ `		<button>取消</button>\n`
-			+ `	</div>\n`
-			+ `</div>`
+		template.innerHTML = html`
+<div id="NGA-config-menu" style="display: none;">
+	<div>用户黑名单</div>
+	<textarea></textarea>
+	<div>版块黑名单</div>
+	<textarea></textarea>
+	<div>
+		<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>
+	</div>
+	<div>
+		<button>确定</button>
+		<button>取消</button>
+	</div>
+</div>`.trim()
 		return template
 	})()
 
@@ -87,7 +96,7 @@ class Popup {
 		this.container.style.display = 'none'
 	}
 
-	private reset() {
+	reset() {
 		this.textAreas[0].value = [...this.config.userBlockList].join('\n')
 		this.textAreas[1].value = [...this.config.subBlockList].join('\n')
 		this.checkbox.checked = this.config.showOriginalImage
@@ -96,7 +105,7 @@ class Popup {
 
 // border: 1px solid #dddddd;
 // box-shadow: 0 2px 8px #dddddd;
-GM_addStyle(`
+GM_addStyle(css`
 	#NGA-config-menu {
 		background-color: #e1efeb;
 		padding: 1rem;
@@ -125,13 +134,16 @@ GM_addStyle(`
 class MenuItem {
 	private template: HTMLTemplateElement
 	private clickHandler: (event: Event) => void
+	private initialized: boolean
 
 	constructor(id: string, title: string, text: string, onClick: (event: Event) => void) {
 		this.template = document.createElement('template')
-		this.template.innerHTML = `<div id="${id}" class="item">\n`
-			+ `	<a href="javascript:void(0)" title="${title}" style="white-space: nowrap;">${text}</a>\n`
-			+ `</div>`
+		this.template.innerHTML = html`
+<div id="${id}" class="item">
+	<a href="javascript:void(0)" title="${title}" style="white-space: nowrap;">${text}</a>
+</div>`.trim()
 		this.clickHandler = onClick
+		this.initialized = false
 	}
 
 	private navButtonOnClickHandler() {
@@ -152,11 +164,15 @@ class MenuItem {
 	}
 
 	init() {
+		if (this.initialized) {
+			return
+		}
 		const navButtons = document.querySelectorAll('#mainmenu .right > .td > a')
 		const startButton = navButtons[0]
 		const messageButton = navButtons[3]
 		for (const button of [startButton, messageButton]) {
 			button.addEventListener('click', () => this.navButtonOnClickHandler())
 		}
+		this.initialized = true
 	}
 }

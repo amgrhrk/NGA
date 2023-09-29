@@ -55,6 +55,10 @@ namespace addClickEventListener {
 function loadImages(config: Config, imageSet: Set<HTMLImageElement>) {
 	const images = document.querySelectorAll<HTMLImageElement>('.postcontent img')
 	for (const image of images) {
+		if (image.style.display === 'none') {
+			image.remove()
+			continue
+		}
 		imageSet.add(image)
 		let modified = false
 		if (image.dataset.srcorg) {
@@ -70,6 +74,12 @@ function loadImages(config: Config, imageSet: Set<HTMLImageElement>) {
 			image.src = image.src + '.thumb.jpg'
 			image.removeAttribute('style')
 			image.style.maxWidth = '200px'
+		}
+		if (document.title.includes('安科')) {
+			image.removeAttribute('style')
+			image.addEventListener('load', () => {
+				image.style.maxWidth = '300px'
+			})
 		}
 	}
 }
@@ -176,4 +186,40 @@ function addBlockButtonForPost(config: Config, post: HTMLTableElement, uidElemen
 		config.save()
 	})
 	uidElement.insertAdjacentElement('afterend', button)
+}
+
+async function waitForElement(id: string): Promise<HTMLElement>
+async function waitForElement(predicate: (element: HTMLElement) => boolean): Promise<HTMLElement>
+async function waitForElement(idOrPredicate: string | ((element: HTMLElement) => boolean)) {
+	if (typeof idOrPredicate === 'string') {
+		return new Promise<HTMLElement>((resolve, reject) => {
+			const observer = new MutationObserver(mutations => {
+				const element = document.getElementById(idOrPredicate)
+				if (element) {
+					resolve(element)
+					observer.disconnect()
+					return
+				}
+			})
+			observer.observe(document.body, { childList: true, subtree: true })
+		})
+	}
+	return new Promise<HTMLElement>((resolve, reject) => {
+		const observer = new MutationObserver(mutations => {
+			for (const mutation of mutations) {
+				for (const node of mutation.addedNodes) {
+					if (node.nodeType !== Node.ELEMENT_NODE) {
+						continue
+					}
+					const element = node as HTMLElement
+					if (idOrPredicate(element)) {
+						resolve(element)
+						observer.disconnect()
+						return
+					}
+				}
+			}
+		})
+		observer.observe(document.body, { attributes: true, childList: true, subtree: true })
+	})
 }
