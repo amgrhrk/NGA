@@ -1,7 +1,18 @@
-const config = new Config()
+function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
+	if (location.pathname === '/thread.php') {
+		Thread.forEach(Thread.process, processedElements, config)
+	} else if (location.pathname === '/read.php') {
+		Post.forEach(Post.process, processedElements, config)
+	}
+	const observer = new MutationObserver(mutations => {
+		Thread.mutationHandler(processedElements, config)
+		Post.mutationHandler(processedElements, config)
+	})
+	observer.observe(document.body, { childList: true, subtree: true })
+}
 
-const injectScript = (() => {
-	let prevNav: HTMLElement | null = null
+(async function main() {
+	const config = new Config()
 	const popup = new Popup(config)
 	config.onSave = () => popup.reset()
 	const menuItems = [
@@ -9,40 +20,10 @@ const injectScript = (() => {
 			popup.show()
 		})
 	] as const
-	const images = new Set<HTMLImageElement>()
-	const observer = new MutationObserver(mutations => {
-		for (const mutation of mutations) {
-			const image = mutation.target as HTMLImageElement
-			if (!images.has(image) || mutation.attributeName !== 'style') {
-				return
-			}
-			image.style.maxWidth = '200px'
-		}
-	})
-	return () => {
-		if (prevNav === document.getElementById('pagebtop')) {
-			setTimeout(injectScript, 0)
-			return
-		}
-		prevNav = document.getElementById('pagebtop')
+	(async function insertMenuItems() {
+		await waitForElement('pagebtop')
 		menuItems.forEach(item => item.init())
-		addClickEventListener.toBreadcrumb(injectScript)
-		addClickEventListener.toPageNavigation(injectScript)
-		addClickEventListener.toThreads(async () => {
-			await waitForElement(element => element instanceof HTMLAnchorElement && element.name === 'uid')
-			injectScript()
-		})
-		if (!processThreads(config)) {
-			loadImages(config, images)
-			processPosts(config)
-		}
-		if (!config.showOriginalImage) {
-			observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true })
-		}
-	}
-})()
-
-;(async function start() {
-	await waitForElement(element => element.id === 'footer')
-	injectScript()
+	})()
+	const processedElements = new WeakSet<HTMLElement>()
+	inject(processedElements, config)
 })()

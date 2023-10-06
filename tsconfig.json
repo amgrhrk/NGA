@@ -9,6 +9,8 @@
 		"src/meta.ts",
 		"src/ui.ts",
 		"src/utils.ts",
+		"src/thread.ts",
+		"src/post.ts",
 		"src/index.ts"
 	]
 }

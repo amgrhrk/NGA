@@ -22,5 +22,5 @@ declare const translate: (text: string) => string
 
 const scriptName = 'NGA屏蔽用户'
 function log(...data: any[]) {
-	console.log(`${scriptName}:`, ...data)
+	console.log(`[${scriptName}]:`, ...data)
 }

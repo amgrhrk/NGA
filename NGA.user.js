@@ -16,7 +16,7 @@
 // ==/UserScript==
 const scriptName = 'NGA屏蔽用户';
 function log(...data) {
-    console.log(`${scriptName}:`, ...data);
+    console.log(`[${scriptName}]:`, ...data);
 }
 const html = String.raw;
 const css = String.raw;
@@ -187,110 +187,118 @@ function addClickEventListener(element, handler) {
         }, { once: true });
     });
 }
-(function (addClickEventListener) {
-    function toBreadcrumb(handler) {
-        for (const link of document.querySelectorAll('.nav_root, .nav_link')) {
-            addClickEventListener(link, handler);
-        }
+async function waitForElement(id) {
+    const element = document.getElementById(id);
+    if (element) {
+        return element;
     }
-    addClickEventListener.toBreadcrumb = toBreadcrumb;
-    function toPageNavigation(handler) {
-        const pageButtons = [document.getElementById('pagebtop'), document.getElementById('pagebbtm')]
-            .filter((nav) => nav)
-            .flatMap(nav => [...nav.querySelectorAll('a:not([name=topage])')]);
-        for (const button of pageButtons) {
-            if (button.title.startsWith('加载')) {
-                continue;
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver(mutations => {
+            const element = document.getElementById(id);
+            if (element) {
+                resolve(element);
+                observer.disconnect();
             }
-            button.style.boxShadow = 'inset 5em 1em gold';
-            addClickEventListener(button, handler);
-        }
-    }
-    addClickEventListener.toPageNavigation = toPageNavigation;
-    function toThreads(handler) {
-        const threads = document.querySelectorAll('.topic');
-        for (const thread of threads) {
-            addClickEventListener(thread, handler);
-        }
-    }
-    addClickEventListener.toThreads = toThreads;
-})(addClickEventListener || (addClickEventListener = {}));
-function loadImages(config, imageSet) {
-    const images = document.querySelectorAll('.postcontent img');
-    for (const image of images) {
-        if (image.style.display === 'none') {
-            image.remove();
-            continue;
-        }
-        imageSet.add(image);
-        let modified = false;
-        if (image.dataset.srcorg) {
-            image.src = image.dataset.srcorg;
-            modified = true;
-        }
-        else if (image.dataset.srclazy) {
-            image.src = image.dataset.srclazy;
-            modified = true;
-        }
-        delete image.dataset.srclazy;
-        delete image.dataset.srcorg;
-        if (!config.showOriginalImage && modified) {
-            image.src = image.src + '.thumb.jpg';
-            image.removeAttribute('style');
-            image.style.maxWidth = '200px';
-        }
-        if (document.title.includes('安科')) {
-            image.removeAttribute('style');
-            image.addEventListener('load', () => {
-                image.style.maxWidth = '300px';
-            });
-        }
-    }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+    });
 }
-function processThreads(config) {
-    const threads = document.querySelectorAll('#topicrows > tbody');
-    if (threads.length === 0) {
-        return false;
+async function waitForSelector(selectors, parent) {
+    const element = parent ? parent.querySelector(selectors) : document.querySelector(selectors);
+    if (element) {
+        return element;
     }
-    for (const thread of threads) {
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver(mutations => {
+            const element = parent ? parent.querySelector(selectors) : document.querySelector(selectors);
+            if (element) {
+                resolve(element);
+                observer.disconnect();
+            }
+        });
+        observer.observe(parent ? parent : document.body, { childList: true, subtree: true });
+    });
+}
+const Thread = {
+    mutationHandler(processedElements, config) {
+        if (location.pathname !== '/thread.php') {
+            return;
+        }
+        Thread.forEach(Thread.process, processedElements, config);
+    },
+    forEach(callback, processedThreads, config) {
+        const threads = document.querySelectorAll('#topicrows > tbody');
+        for (const thread of threads) {
+            if (!processedThreads.has(thread)) {
+                callback(thread, config);
+                processedThreads.add(thread);
+            }
+        }
+    },
+    process(thread, config) {
         const url = thread.querySelector('a[class=author]');
         if (!url) {
-            continue;
+            return;
         }
         const uid = parseInt(url.title.replace('用户ID ', ''));
         const sub = thread.querySelector('span.titleadd2');
         if (config.userBlockList.has(uid) || (sub && config.subBlockList.has(sub.innerText))) {
             thread.style.display = 'none';
-            continue;
+            return;
         }
         const title = thread.querySelector('.topic');
         if (title) {
             title.innerText = translate(title.innerText);
         }
-        addBlockButton(thread, url, uid, config);
+        Thread.addBlockButton(thread, url, uid, config);
+    },
+    addBlockButton(thread, url, uid, config) {
+        const button = document.createElement('a');
+        button.href = 'javascript:void(0)';
+        button.innerText = '屏蔽';
+        button.style.marginLeft = '8px';
+        button.addEventListener('click', () => {
+            thread.style.display = 'none';
+            config.userBlockList.add(uid);
+            config.save();
+        });
+        url.insertAdjacentElement('afterend', button);
     }
-    return true;
+};
+class UidElementNotFoundError extends TypeError {
 }
-function addBlockButton(thread, url, uid, config) {
-    const button = document.createElement('a');
-    button.href = 'javascript:void(0)';
-    button.innerText = '屏蔽';
-    button.style.marginLeft = '8px';
-    button.addEventListener('click', () => {
-        thread.style.display = 'none';
-        config.userBlockList.add(uid);
-        config.save();
-    });
-    url.insertAdjacentElement('afterend', button);
-}
-function processPosts(config) {
-    const posts = document.querySelectorAll('table.forumbox.postbox');
-    for (const post of posts) {
+const Post = {
+    mutationHandler(processedElements, config) {
+        if (location.pathname !== '/read.php') {
+            return;
+        }
+        Post.forEach(Post.process, processedElements, config);
+    },
+    forEach(callback, processedPosts, config) {
+        const posts = document.querySelectorAll('#m_posts_c > .postbox');
+        for (const post of posts) {
+            if (!processedPosts.has(post)) {
+                try {
+                    callback(post, config);
+                    processedPosts.add(post);
+                }
+                catch (err) {
+                    if (!(err instanceof UidElementNotFoundError)) {
+                        throw err;
+                    }
+                }
+            }
+        }
+    },
+    process(post, config) {
         const uidElement = post.querySelector('a[name=uid]');
+        if (!uidElement) {
+            throw new UidElementNotFoundError();
+        }
         const uid = parseInt(uidElement.innerText);
         if (config.userBlockList.has(uid)) {
             post.style.display = 'none';
-            continue;
+            return;
         }
         const postContent = post.querySelector('.postcontent');
         const quote = postContent.querySelector('.quote');
@@ -304,71 +312,94 @@ function processPosts(config) {
                 }
             }, { once: true });
         }
-        processQuote(config, quote);
-        addBlockButtonForPost(config, post, uidElement, uid);
-    }
-    return true;
-}
-function processQuote(config, quote) {
-    if (!quote) {
-        return;
-    }
-    const qUser = quote.querySelector('a.b');
-    if (qUser) {
-        const match = qUser.href.match(/uid=(.+$)/);
-        if (match) {
-            const qUid = parseInt(match[1]);
-            if (config.userBlockList.has(qUid)) {
-                quote.style.display = 'none';
-                return;
+        Post.processQuote(quote, config);
+        Post.addBlockButton(post, uidElement, uid, config);
+        Post.resizeImages(post, config);
+    },
+    processQuote(quote, config) {
+        if (!quote) {
+            return;
+        }
+        const qUser = quote.querySelector('a.b');
+        if (qUser) {
+            const match = qUser.href.match(/uid=(.+$)/);
+            if (match) {
+                const qUid = parseInt(match[1]);
+                if (config.userBlockList.has(qUid)) {
+                    quote.style.display = 'none';
+                    return;
+                }
+                translateChildTextNodes(quote);
+                const collapseButton = quote.querySelector('button[name=collapseSwitchButton]');
+                if (collapseButton) {
+                    collapseButton.addEventListener('click', () => {
+                        const collapseContent = quote.querySelector('.collapse_content');
+                        if (collapseContent) {
+                            translateChildTextNodes(collapseContent);
+                        }
+                    }, { once: true });
+                }
             }
-            translateChildTextNodes(quote);
-            const collapseButton = quote.querySelector('button[name=collapseSwitchButton]');
-            if (collapseButton) {
-                collapseButton.addEventListener('click', () => {
-                    const collapseContent = quote.querySelector('.collapse_content');
-                    if (collapseContent) {
-                        translateChildTextNodes(collapseContent);
-                    }
-                }, { once: true });
+        }
+    },
+    addBlockButton(post, uidElement, uid, config) {
+        const button = document.createElement('a');
+        button.href = 'javascript:void(0)';
+        button.innerText = '屏蔽';
+        button.addEventListener('click', () => {
+            post.style.display = 'none';
+            config.userBlockList.add(uid);
+            config.save();
+        });
+        uidElement.insertAdjacentElement('afterend', button);
+    },
+    resizeImages(post, config) {
+        const images = post.querySelectorAll('img');
+        for (const image of images) {
+            if (image.style.display === 'none') {
+                image.remove();
+                continue;
+            }
+            let modified = false;
+            if (image.dataset.srcorg) {
+                image.src = image.dataset.srcorg;
+                modified = true;
+            }
+            else if (image.dataset.srclazy) {
+                image.src = image.dataset.srclazy;
+                modified = true;
+            }
+            delete image.dataset.srclazy;
+            delete image.dataset.srcorg;
+            if (!config.showOriginalImage && modified) {
+                image.src = image.src + '.thumb.jpg';
+                image.removeAttribute('style');
+                image.style.maxWidth = '200px';
+            }
+            if (document.title.includes('安科')) {
+                image.removeAttribute('style');
+                image.addEventListener('load', () => {
+                    image.style.maxWidth = '300px';
+                });
             }
         }
     }
-}
-function addBlockButtonForPost(config, post, uidElement, uid) {
-    const button = document.createElement('a');
-    button.href = 'javascript:void(0)';
-    button.innerText = '屏蔽';
-    button.addEventListener('click', () => {
-        post.style.display = 'none';
-        config.userBlockList.add(uid);
-        config.save();
+};
+function inject(processedElements, config) {
+    if (location.pathname === '/thread.php') {
+        Thread.forEach(Thread.process, processedElements, config);
+    }
+    else if (location.pathname === '/read.php') {
+        Post.forEach(Post.process, processedElements, config);
+    }
+    const observer = new MutationObserver(mutations => {
+        Thread.mutationHandler(processedElements, config);
+        Post.mutationHandler(processedElements, config);
     });
-    uidElement.insertAdjacentElement('afterend', button);
+    observer.observe(document.body, { childList: true, subtree: true });
 }
-async function waitForElement(predicate) {
-    return new Promise((resolve, reject) => {
-        const observer = new MutationObserver(mutations => {
-            for (const mutation of mutations) {
-                for (const node of mutation.addedNodes) {
-                    if (node.nodeType !== Node.ELEMENT_NODE) {
-                        continue;
-                    }
-                    const element = node;
-                    if (predicate(element)) {
-                        resolve(element);
-                        observer.disconnect();
-                        return;
-                    }
-                }
-            }
-        });
-        observer.observe(document.body, { attributes: true, childList: true, subtree: true });
-    });
-}
-const config = new Config();
-const injectScript = (() => {
-    let prevNav = null;
+(async function main() {
+    const config = new Config();
     const popup = new Popup(config);
     config.onSave = () => popup.reset();
     const menuItems = [
@@ -376,39 +407,10 @@ const injectScript = (() => {
             popup.show();
         })
     ];
-    const images = new Set();
-    const observer = new MutationObserver(mutations => {
-        for (const mutation of mutations) {
-            const image = mutation.target;
-            if (!images.has(image) || mutation.attributeName !== 'style') {
-                return;
-            }
-            image.style.maxWidth = '200px';
-        }
-    });
-    return () => {
-        if (prevNav === document.getElementById('pagebtop')) {
-            setTimeout(injectScript, 0);
-            return;
-        }
-        prevNav = document.getElementById('pagebtop');
+    (async function insertMenuItems() {
+        await waitForElement('pagebtop');
         menuItems.forEach(item => item.init());
-        addClickEventListener.toBreadcrumb(injectScript);
-        addClickEventListener.toPageNavigation(injectScript);
-        addClickEventListener.toThreads(async () => {
-            await waitForElement(element => element instanceof HTMLAnchorElement && element.name === 'uid');
-            injectScript();
-        });
-        if (!processThreads(config)) {
-            loadImages(config, images);
-            processPosts(config);
-        }
-        if (!config.showOriginalImage) {
-            observer.observe(document.body, { attributes: true, subtree: true, attributeOldValue: true });
-        }
-    };
-})();
-(async function start() {
-    await waitForElement(element => element.id === 'footer');
-    injectScript();
+    })();
+    const processedElements = new WeakSet();
+    inject(processedElements, config);
 })();
