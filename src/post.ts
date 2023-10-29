@@ -1,96 +1,212 @@
 class UidElementNotFoundError extends TypeError {}
-const Post = {
-	mutationHandler(processedElements: WeakSet<HTMLElement>, config: Config) {
-		if (location.pathname !== '/read.php') {
+
+class Quote extends PostLike {
+	private static readonly pool = new WeakMap<Quote['element'], Quote>()
+	static readonly selector = '.quote'
+
+	readonly element: HTMLElement
+	_uid: number | null
+
+	/** @deprecated Use Quote.from() instead */
+	constructor(element: Quote['element']) {
+		super()
+		this.element = element
+		this._uid = null
+	}
+
+	static from(element: Quote['element']) {
+		return Quote._from(element, Quote, Quote.pool)
+	}
+
+	get uid() {
+		if (this._uid == null) {
+			const user = this.element.querySelector<HTMLAnchorElement>('a.b')!
+			const match = user.href.match(/uid=(.+$)/)!
+			this._uid = Number.parseInt(match[1])
+		}
+		return this._uid
+	}
+
+	hide() {
+		this.element.style.display = 'none'
+	}
+
+	process(config: Config) {
+		if (config.userBlockList.has(this.uid)) {
+			this.hide()
 			return
 		}
-		Post.forEach(Post.process, processedElements, config)
-	},
-
-	forEach(callback: (post: HTMLTableElement, config: Config) => void, processedPosts: WeakSet<HTMLTableElement>, config: Config) {
-		const posts = document.querySelectorAll<HTMLTableElement>('#m_posts_c > .postbox')
-		for (const post of posts) {
-			if (!processedPosts.has(post)) {
-				try {
-					callback(post, config)
-					processedPosts.add(post)
-				} catch (err) {
-					if (!(err instanceof UidElementNotFoundError)) {
-						throw err
-					}
-				}
-			}
+		if (config.translate) {
+			translateChildTextNodes(this.element)
 		}
-	},
-
-	process(post: HTMLTableElement, config: Config) {
-		const uidElement = post.querySelector<HTMLAnchorElement>('a[name=uid]')!
-		if (!uidElement) {
-			throw new UidElementNotFoundError()
-		}
-		const uid = parseInt(uidElement.innerText)
-		if (config.userBlockList.has(uid)) {
-			post.style.display = 'none'
-			return
-		}
-		const postContent = post.querySelector<HTMLElement>('.postcontent')!
-		const quote = postContent.querySelector<HTMLElement>('.quote')
-		translateChildTextNodes(postContent, quote)
-		const collapseButton = postContent.querySelector('button[name=collapseSwitchButton]')
+		const collapseButton = this.element.querySelector('button[name=collapseSwitchButton]')
 		if (collapseButton) {
 			collapseButton.addEventListener('click', () => {
-				const collapseContent = postContent.querySelector<HTMLElement>('.collapse_content')
-				if (collapseContent) {
+				const collapseContent = this.element.querySelector('.collapse_content')
+				if (collapseContent && config.translate) {
 					translateChildTextNodes(collapseContent)
 				}
 			}, { once: true })
 		}
-		Post.processQuote(quote, config)
-		Post.addBlockButton(post, uidElement, uid, config)
-		Post.resizeImages(post, config)
-	},
+	}
+}
 
-	processQuote(quote: HTMLElement | null, config: Config) {
-		if (!quote) {
-			return
+class Post extends PostLike {
+	private static readonly pool = new WeakMap<Post['element'], Post>()
+	static readonly selector = '#m_posts_c > .postbox'
+
+	readonly element: HTMLTableElement
+	private _uid: number | null
+	private _prestige: number | null
+	private _fame: number | null
+	private _content: HTMLElement | null
+	private _quote: Quote | null
+
+	/** @deprecated Use Post.from() instead */
+	constructor(element: Post['element']) {
+		super()
+		this.element = element
+		this._uid = null
+		this._prestige = null
+		this._fame = null
+		this._content = null
+		this._quote = null
+	}
+
+	static from(element: Post['element']) {
+		return Post._from(element, Post, Post.pool)
+	}
+
+	static forEach(callback: (post: Post, config: Config) => void, processedElements: WeakSet<HTMLElement>, config: Config) {
+		Post._forEach(callback, processedElements, config, Post, Post.pool)
+	}
+
+	get uid() {
+		if (this._uid == null) {
+			const uidElement = this.element.querySelector<HTMLAnchorElement>('a[name=uid]')
+			if (!uidElement) {
+				throw new UidElementNotFoundError()
+			}
+			this._uid = Number.parseInt(uidElement.innerText)
 		}
-		const qUser = quote.querySelector<HTMLAnchorElement>('a.b')
-		if (qUser) {
-			const match = qUser.href.match(/uid=(.+$)/)
-			if (match) {
-				const qUid = parseInt(match[1])
-				if (config.userBlockList.has(qUid)) {
-					quote.style.display = 'none'
-					return
-				}
-				translateChildTextNodes(quote)
-				const collapseButton = quote.querySelector('button[name=collapseSwitchButton]')
-				if (collapseButton) {
-					collapseButton.addEventListener('click', () => {
-						const collapseContent = quote.querySelector('.collapse_content')
-						if (collapseContent) {
-							translateChildTextNodes(collapseContent)
+		return this._uid
+	}
+
+	get content() {
+		if (!this._content) {
+			this._content = this.element.querySelector<HTMLElement>('.postcontent')
+		}
+		return this._content
+	}
+
+	get quote() {
+		if (!this._quote) {
+			const content = this.content!
+			const quote = content.querySelector<HTMLElement>(Quote.selector)
+			if (quote) {
+				this._quote = Quote.from(quote)
+			}
+		}
+		return this._quote
+	}
+
+	get prestige() {
+		if (this._prestige == null) {
+			try {
+				const info = this.element.querySelector<HTMLElement>('.stat')!
+				this._prestige = Number.parseInt(info.innerText.match(/威望: (-?\d+)/)![1], 10) || 0
+			} catch (err) {
+				try {
+					const inlineInfo = this.element.querySelector<HTMLElement>('.posterInfoLine')!
+					const columns = inlineInfo.querySelectorAll<HTMLElement>('.usercol')
+					for (const column of columns) {
+						if (column.innerText.includes('威望')) {
+							const title = column.querySelector<HTMLElement>('.userval')!.title
+							this._prestige = Number.parseInt(title, 10) || 0
+							return this._prestige
 						}
-					}, { once: true })
+					}
+					throw new RangeError()
+				} catch (err) {
+					throw err
 				}
 			}
 		}
-	},
+		return this._prestige
+	}
 
-	addBlockButton(post: HTMLTableElement, uidElement: HTMLAnchorElement, uid: number, config: Config) {
+	get fame() {
+		if (this._fame == null) {
+			try {
+				const info = this.element.querySelector<HTMLElement>('.stat')!
+				this._fame = Number.parseInt(info.innerText.match(/声望: (-?\d+)/)![1], 10) || 0
+			} catch (err) {
+				try {
+					const inlineInfo = this.element.querySelector<HTMLElement>('.posterInfoLine')!
+					const columns = inlineInfo.querySelectorAll<HTMLElement>('.usercol')
+					for (const column of columns) {
+						if (column.innerText.includes('声望')) {
+							const title = column.querySelector<HTMLElement>('.userval')!.title
+							this._fame = Number.parseInt(title, 10) || 0
+							return this._fame
+						}
+					}
+					throw new RangeError()
+				} catch (err) {
+					throw err
+				}
+			}
+		}
+		return this._fame
+	}
+
+	hide() {
+		this.element.style.display = 'none'
+	}
+
+	process(config: Config) {
+		if (config.userBlockList.has(this.uid)) {
+			this.hide()
+			return
+		}
+		if (config.minPrestige != null || config.minPrestige != null) {
+			if (this.prestige < config.minPrestige || this.fame < config.minPrestige) {
+				this.hide()
+				return
+			}
+		}
+		if (config.translate) {
+			translateChildTextNodes(this.content!, this.quote?.element)
+		}
+		const collapseButton = this._content!.querySelector('button[name=collapseSwitchButton]')
+		if (collapseButton) {
+			collapseButton.addEventListener('click', () => {
+				const collapseContent = this.content!.querySelector<HTMLElement>('.collapse_content')
+				if (collapseContent && config.translate) {
+					translateChildTextNodes(collapseContent)
+				}
+			}, { once: true })
+		}
+		this.quote?.process(config)
+		this.addBlockButton(config)
+		this.resizeImages(config)
+	}
+
+	private addBlockButton(config: Config) {
 		const button = document.createElement('a')
 		button.href = 'javascript:void(0)'
 		button.innerText = '屏蔽'
 		button.addEventListener('click', () => {
-			post.style.display = 'none'
-			config.userBlockList.add(uid)
+			this.hide()
+			config.userBlockList.add(this.uid)
 			config.save()
 		})
+		const uidElement = this.element.querySelector<HTMLAnchorElement>('a[name=uid]')!
 		uidElement.insertAdjacentElement('afterend', button)
-	},
+	}
 
-	resizeImages(post: HTMLTableElement, config: Config) {
-		const images = post.querySelectorAll<HTMLImageElement>('img')
+	private resizeImages(config: Config) {
+		const images = this.element.querySelectorAll<HTMLImageElement>('img')
 		for (const image of images) {
 			if (image.style.display === 'none') {
 				image.remove()
@@ -119,4 +235,4 @@ const Post = {
 			}
 		}
 	}
-} as const
+}

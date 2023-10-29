@@ -1,12 +1,15 @@
 function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 	if (location.pathname === '/thread.php') {
-		Thread.forEach(Thread.process, processedElements, config)
+		Thread.forEach(thread => thread.process(config), processedElements, config)
 	} else if (location.pathname === '/read.php') {
-		Post.forEach(Post.process, processedElements, config)
+		Post.forEach(post => post.process(config), processedElements, config)
 	}
-	const observer = new MutationObserver(mutations => {
-		Thread.mutationHandler(processedElements, config)
-		Post.mutationHandler(processedElements, config)
+	const observer = new MutationObserver(() => {
+		if (location.pathname === '/thread.php') {
+			Thread.forEach(thread => thread.process(config), processedElements, config)
+		} else if (location.pathname === '/read.php') {
+			Post.forEach(post => post.process(config), processedElements, config)
+		}
 	})
 	observer.observe(document.body, { childList: true, subtree: true })
 }
