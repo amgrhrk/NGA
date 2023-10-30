@@ -11,13 +11,16 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addStyle
+// @grant        GM_getResourceText
 // @require      https://cdn.jsdelivr.net/gh/amgrhrk/NGA/src/translate.js
+// @resource     list https://raw.githubusercontent.com/amgrhrk/NGA/main/list.json
 // @run-at       document-body
 // ==/UserScript==
 
 declare function GM_setValue(name: string, value: any): void
 declare function GM_getValue(name: string, defaultValue?: any): any
 declare function GM_addStyle(css: string): void
+declare function GM_getResourceText(name: string): string
 declare const translate: (text: string) => string
 
 const scriptName = 'NGA屏蔽用户'

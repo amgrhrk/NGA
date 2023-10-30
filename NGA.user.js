@@ -11,7 +11,9 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addStyle
+// @grant        GM_getResourceText
 // @require      https://cdn.jsdelivr.net/gh/amgrhrk/NGA/src/translate.js
+// @resource     list https://raw.githubusercontent.com/amgrhrk/NGA/main/list.json
 // @run-at       document-body
 // ==/UserScript==
 const scriptName = 'NGA屏蔽用户';
@@ -32,6 +34,21 @@ function dedent(strings, ...values) {
 }
 const html = dedent;
 const css = dedent;
+class CloudList {
+    constructor(enabled) {
+        this.enabled = enabled === true ? true : false;
+        try {
+            this.set = new Set(JSON.parse(GM_getResourceText('list')));
+        }
+        catch (err) {
+            log(err);
+            this.set = new Set();
+        }
+    }
+    has(uid) {
+        return this.set.has(uid);
+    }
+}
 class Config {
     constructor() {
         const config = (GM_getValue(scriptName) || {});
@@ -41,6 +58,7 @@ class Config {
         this.translate = config.translate === true ? true : false;
         this.minPrestige = typeof config.minPrestige === 'number' ? config.minPrestige : null;
         this.minFame = typeof config.minFame === 'number' ? config.minFame : null;
+        this.cloudList = new CloudList(config.cloudList);
         this.onSave = null;
     }
     save() {
@@ -51,6 +69,7 @@ class Config {
         config.minFame = this.minFame;
         config.showOriginalImage = this.showOriginalImage;
         config.translate = this.translate;
+        config.cloudList = this.cloudList.enabled;
         GM_setValue(scriptName, config);
         if (this.onSave) {
             this.onSave();
@@ -63,7 +82,7 @@ class Popup {
         this.container = Popup.template.content.firstElementChild.cloneNode(true);
         this.textAreas = [...this.container.querySelectorAll('textarea')];
         this.thresholds = [...this.container.querySelectorAll('#threshold > input')];
-        this.checkboxes = [this.container.querySelector('#showOriginalImage'), this.container.querySelector('#translate')];
+        this.checkboxes = [this.container.querySelector('#showOriginalImage'), this.container.querySelector('#translate'), this.container.querySelector('#cloudList')];
         this.reset();
         const [confirmButton, cancelButton] = this.container.querySelectorAll('button');
         confirmButton.addEventListener('click', () => {
@@ -90,6 +109,7 @@ class Popup {
         this.thresholds[1].value = this.config.minFame != null ? `${this.config.minFame}` : '';
         this.checkboxes[0].checked = this.config.showOriginalImage;
         this.checkboxes[1].checked = this.config.translate;
+        this.checkboxes[2].checked = this.config.cloudList.enabled;
     }
     save() {
         this.config.userBlockList = new Set(this.textAreas[0].value
@@ -105,7 +125,8 @@ class Popup {
         const fame = this.thresholds[1].value.trim();
         this.config.minFame = fame === '' ? null : (Number.parseInt(fame) || this.config.minFame);
         this.config.showOriginalImage = this.checkboxes[0].checked;
-        this.config.translate = this.checkboxes[1].translate;
+        this.config.translate = this.checkboxes[1].checked;
+        this.config.cloudList.enabled = this.checkboxes[2].checked;
         this.config.save();
     }
 }
@@ -124,6 +145,7 @@ Popup.template = (() => {
 				<div>
 					<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>
 					<input type="checkbox" id="translate"><label for="translate">繁转简</label>
+					<input type="checkbox" id="cloudList"><label for="cloudList">云屏蔽</label>
 				</div>
 				<div>
 					<button>确定</button>
@@ -317,7 +339,7 @@ class Thread extends PostLike {
         this.element.style.display = 'none';
     }
     process(config) {
-        if (config.userBlockList.has(this.uid) || (this.sub && config.subBlockList.has(this.sub))) {
+        if (config.userBlockList.has(this.uid) || (this.sub && config.subBlockList.has(this.sub)) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
             this.hide();
             return;
         }
@@ -367,7 +389,7 @@ class Quote extends PostLike {
         this.element.style.display = 'none';
     }
     process(config) {
-        if (config.userBlockList.has(this.uid)) {
+        if (config.userBlockList.has(this.uid) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
             this.hide();
             return;
         }
@@ -486,7 +508,7 @@ class Post extends PostLike {
         this.element.style.display = 'none';
     }
     process(config) {
-        if (config.userBlockList.has(this.uid)) {
+        if (config.userBlockList.has(this.uid) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
             this.hide();
             return;
         }

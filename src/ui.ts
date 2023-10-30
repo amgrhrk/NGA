@@ -5,6 +5,7 @@ interface GMConfig {
 	translate?: boolean
 	minPrestige?: number | null
 	minFame?: number | null
+	cloudList?: boolean
 }
 
 function dedent(strings: TemplateStringsArray , ...values: unknown[]) {
@@ -23,6 +24,26 @@ function dedent(strings: TemplateStringsArray , ...values: unknown[]) {
 const html = dedent
 const css = dedent
 
+
+class CloudList {
+	enabled: boolean
+	private readonly set: Set<number>
+
+	constructor(enabled?: boolean) {
+		this.enabled = enabled === true ? true : false
+		try {
+			this.set = new Set(JSON.parse(GM_getResourceText('list')))
+		} catch (err) {
+			log(err)
+			this.set = new Set()
+		}
+	}
+
+	has(uid: number) {
+		return this.set.has(uid)
+	}
+}
+
 class Config {
 	userBlockList: Set<number>
 	subBlockList: Set<string>
@@ -30,6 +51,7 @@ class Config {
 	translate: boolean
 	minPrestige: number | null
 	minFame: number | null
+	cloudList: CloudList
 	onSave: (() => void) | null
 
 	constructor() {
@@ -40,6 +62,7 @@ class Config {
 		this.translate = config.translate === true ? true : false
 		this.minPrestige = typeof config.minPrestige === 'number' ? config.minPrestige : null
 		this.minFame = typeof config.minFame === 'number' ? config.minFame : null
+		this.cloudList = new CloudList(config.cloudList)
 		this.onSave = null
 	}
 
@@ -51,6 +74,7 @@ class Config {
 		config.minFame = this.minFame
 		config.showOriginalImage = this.showOriginalImage
 		config.translate = this.translate
+		config.cloudList = this.cloudList.enabled
 		GM_setValue(scriptName, config)
 		if (this.onSave) {
 			this.onSave()
@@ -63,7 +87,7 @@ class Popup {
 	container: HTMLDivElement
 	textAreas: readonly [HTMLTextAreaElement, HTMLTextAreaElement]
 	thresholds: readonly [HTMLInputElement, HTMLInputElement]
-	checkboxes: readonly [HTMLInputElement, HTMLInputElement]
+	checkboxes: readonly [HTMLInputElement, HTMLInputElement, HTMLInputElement]
 
 	private static template = (() => {
 		const template = document.createElement('template')
@@ -80,6 +104,7 @@ class Popup {
 				<div>
 					<input type="checkbox" id="showOriginalImage"><label for="showOriginalImage">显示原图</label>
 					<input type="checkbox" id="translate"><label for="translate">繁转简</label>
+					<input type="checkbox" id="cloudList"><label for="cloudList">云屏蔽</label>
 				</div>
 				<div>
 					<button>确定</button>
@@ -95,7 +120,7 @@ class Popup {
 		this.container = Popup.template.content.firstElementChild!.cloneNode(true) as HTMLDivElement
 		this.textAreas = [...this.container.querySelectorAll('textarea')] as [HTMLTextAreaElement, HTMLTextAreaElement]
 		this.thresholds = [...this.container.querySelectorAll('#threshold > input')] as [HTMLInputElement, HTMLInputElement]
-		this.checkboxes = [this.container.querySelector('#showOriginalImage')!, this.container.querySelector('#translate')!]
+		this.checkboxes = [this.container.querySelector('#showOriginalImage')!, this.container.querySelector('#translate')!, this.container.querySelector('#cloudList')!]
 		this.reset()
 		const [confirmButton, cancelButton] = this.container.querySelectorAll('button')
 		confirmButton.addEventListener('click', () => {
@@ -125,6 +150,7 @@ class Popup {
 		this.thresholds[1].value = this.config.minFame != null ? `${this.config.minFame}` : ''
 		this.checkboxes[0].checked = this.config.showOriginalImage
 		this.checkboxes[1].checked = this.config.translate
+		this.checkboxes[2].checked = this.config.cloudList.enabled
 	}
 
 	save() {
@@ -143,7 +169,8 @@ class Popup {
 		const fame = this.thresholds[1].value.trim()
 		this.config.minFame = fame === '' ? null : (Number.parseInt(fame) || this.config.minFame)
 		this.config.showOriginalImage = this.checkboxes[0].checked
-		this.config.translate = this.checkboxes[1].translate
+		this.config.translate = this.checkboxes[1].checked
+		this.config.cloudList.enabled = this.checkboxes[2].checked
 		this.config.save()
 	}
 }
