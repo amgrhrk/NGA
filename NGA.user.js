@@ -322,7 +322,7 @@ class Thread extends PostLike {
     get uid() {
         if (this._uid == null) {
             const url = this.element.querySelector('a[class=author]');
-            this._uid = Number.parseInt(url.title.replace('用户ID ', ''));
+            this._uid = Number.parseInt(new URL(url.href).searchParams.get('uid'));
         }
         return this._uid;
     }
@@ -355,6 +355,10 @@ class Thread extends PostLike {
         button.innerText = '屏蔽';
         button.style.marginLeft = '8px';
         button.addEventListener('click', () => {
+            if (this.uid <= 0 || Number.isNaN(this.uid)) {
+                log(this.uid);
+                return;
+            }
             this.hide();
             config.userBlockList.add(this.uid);
             config.save();
@@ -539,6 +543,10 @@ class Post extends PostLike {
         button.href = 'javascript:void(0)';
         button.innerText = '屏蔽';
         button.addEventListener('click', () => {
+            if (this.uid <= 0 || Number.isNaN(this.uid)) {
+                log(this.uid);
+                return;
+            }
             this.hide();
             config.userBlockList.add(this.uid);
             config.save();

@@ -197,6 +197,10 @@ class Post extends PostLike {
 		button.href = 'javascript:void(0)'
 		button.innerText = '屏蔽'
 		button.addEventListener('click', () => {
+			if (this.uid <= 0 || Number.isNaN(this.uid)) {
+				log(this.uid)
+				return
+			}
 			this.hide()
 			config.userBlockList.add(this.uid)
 			config.save()
