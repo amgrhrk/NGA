@@ -204,9 +204,10 @@ class MenuItem {
         if (!vanillaSettingsItem) {
             return;
         }
+        const menu = vanillaSettingsItem.parentElement.parentElement;
         const menuItem = this.template.content.firstElementChild.cloneNode(true);
         menuItem.firstElementChild.addEventListener('click', this.clickHandler);
-        vanillaSettingsItem.parentElement.insertAdjacentElement('afterend', menuItem);
+        menu.appendChild(menuItem);
     }
     init() {
         if (this.initialized) {
@@ -304,7 +305,16 @@ class PostLike {
             }
         }
     }
+    hide() {
+        PostLike.hiddenPosts.add(this);
+        this.element.style.display = 'none';
+    }
+    show() {
+        PostLike.hiddenPosts.add(this);
+        this.element.style.display = 'none';
+    }
 }
+PostLike.hiddenPosts = new Set();
 class Thread extends PostLike {
     /** @deprecated Use Thread.from() instead */
     constructor(element) {
@@ -334,9 +344,6 @@ class Thread extends PostLike {
             }
         }
         return this._sub;
-    }
-    hide() {
-        this.element.style.display = 'none';
     }
     process(config) {
         if (config.userBlockList.has(this.uid) || (this.sub && config.subBlockList.has(this.sub)) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
@@ -449,9 +456,14 @@ class Post extends PostLike {
     get quote() {
         if (!this._quote) {
             const content = this.content;
-            const quote = content.querySelector(Quote.selector);
-            if (quote) {
-                this._quote = Quote.from(quote);
+            const quotes = content.querySelectorAll(Quote.selector);
+            for (const quote of quotes) {
+                if (quote.children[0]?.tagName === 'A') {
+                    if (!this._quote) {
+                        this._quote = [];
+                    }
+                    this._quote.push(Quote.from(quote));
+                }
             }
         }
         return this._quote;
@@ -508,9 +520,6 @@ class Post extends PostLike {
         }
         return this._fame;
     }
-    hide() {
-        this.element.style.display = 'none';
-    }
     process(config) {
         if (config.userBlockList.has(this.uid) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
             this.hide();
@@ -523,18 +532,18 @@ class Post extends PostLike {
             }
         }
         if (config.translate) {
-            translateChildTextNodes(this.content, this.quote?.element);
+            translateChildTextNodes(this.content);
+            const collapseButtons = this.content.querySelectorAll('button[name=collapseSwitchButton]');
+            for (const button of collapseButtons) {
+                button.addEventListener('click', () => {
+                    const collapseContent = button.parentElement.nextElementSibling;
+                    if (collapseContent && collapseContent.classList.contains('collapse_content')) {
+                        translateChildTextNodes(collapseContent);
+                    }
+                }, { once: true });
+            }
         }
-        const collapseButton = this._content.querySelector('button[name=collapseSwitchButton]');
-        if (collapseButton) {
-            collapseButton.addEventListener('click', () => {
-                const collapseContent = this.content.querySelector('.collapse_content');
-                if (collapseContent && config.translate) {
-                    translateChildTextNodes(collapseContent);
-                }
-            }, { once: true });
-        }
-        this.quote?.process(config);
+        this.quote?.forEach(quote => quote.process(config));
         this.addBlockButton(config);
         this.resizeImages(config);
     }
@@ -585,25 +594,49 @@ class Post extends PostLike {
             }
         }
     }
+    static processTitleAndNav(processedElements, config) {
+        if (!config.translate) {
+            return;
+        }
+        {
+            const title = document.getElementById('postsubject0');
+            if (title && !processedElements.has(title)) {
+                translateChildTextNodes(title);
+                processedElements.add(title);
+            }
+        }
+        {
+            const topNavButtons = document.querySelectorAll('#m_nav .nav_link');
+            const title = topNavButtons[topNavButtons.length - 1];
+            if (title && !processedElements.has(title)) {
+                translateChildTextNodes(title);
+                processedElements.add(title);
+            }
+        }
+        {
+            const bottomNavButtons = document.querySelectorAll('#b_nav .nav_link');
+            const title = bottomNavButtons[bottomNavButtons.length - 1];
+            if (title && !processedElements.has(title)) {
+                translateChildTextNodes(title);
+                processedElements.add(title);
+            }
+        }
+    }
 }
 Post.pool = new WeakMap();
 Post.selector = '#m_posts_c > .postbox';
 function inject(processedElements, config) {
-    if (location.pathname === '/thread.php') {
+    const popup = document.querySelector('.commonwindow');
+    if (popup && popup.innerText === '\u200b\n访客不能直接访问\n\n你可能需要 [登录] 后访问...\n\n[后退]') {
+        location.reload();
+    }
+    else if (location.pathname === '/thread.php') {
         Thread.forEach(thread => thread.process(config), processedElements, config);
     }
     else if (location.pathname === '/read.php') {
+        Post.processTitleAndNav(processedElements, config);
         Post.forEach(post => post.process(config), processedElements, config);
     }
-    const observer = new MutationObserver(() => {
-        if (location.pathname === '/thread.php') {
-            Thread.forEach(thread => thread.process(config), processedElements, config);
-        }
-        else if (location.pathname === '/read.php') {
-            Post.forEach(post => post.process(config), processedElements, config);
-        }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
 }
 (async function main() {
     const config = new Config();
@@ -612,7 +645,22 @@ function inject(processedElements, config) {
     const menuItems = [
         new MenuItem('NGA-settings-item', '设置 - 扩展设置', '扩展设置', () => {
             popup.show();
-        })
+        }),
+        new MenuItem('NGA-settings-item-toggle', '设置 - 切换隐藏帖子', '切换隐藏帖子（隐藏中）', (() => {
+            let hiding = true;
+            return (e) => {
+                const self = e.target;
+                if (hiding) {
+                    self.innerText = '切换隐藏帖子（显示中）';
+                    PostLike.hiddenPosts.forEach(post => post.show());
+                }
+                else {
+                    self.innerText = '切换隐藏帖子（隐藏中）';
+                    PostLike.hiddenPosts.forEach(post => post.hide());
+                }
+                hiding = !hiding;
+            };
+        })()),
     ];
     (async function insertMenuItems() {
         await waitForElement('pagebtop');
@@ -620,4 +668,8 @@ function inject(processedElements, config) {
     })();
     const processedElements = new WeakSet();
     inject(processedElements, config);
+    const observer = new MutationObserver(() => {
+        inject(processedElements, config);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 })();

@@ -1,17 +1,13 @@
 function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
-	if (location.pathname === '/thread.php') {
+	const popup = document.querySelector<HTMLDivElement>('.commonwindow')
+	if (popup && popup.innerText === '\u200b\n访客不能直接访问\n\n你可能需要 [登录] 后访问...\n\n[后退]') {
+		location.reload()
+	} else if (location.pathname === '/thread.php') {
 		Thread.forEach(thread => thread.process(config), processedElements, config)
 	} else if (location.pathname === '/read.php') {
+		Post.processTitleAndNav(processedElements, config)
 		Post.forEach(post => post.process(config), processedElements, config)
 	}
-	const observer = new MutationObserver(() => {
-		if (location.pathname === '/thread.php') {
-			Thread.forEach(thread => thread.process(config), processedElements, config)
-		} else if (location.pathname === '/read.php') {
-			Post.forEach(post => post.process(config), processedElements, config)
-		}
-	})
-	observer.observe(document.body, { childList: true, subtree: true })
 }
 
 (async function main() {
@@ -21,7 +17,21 @@ function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 	const menuItems = [
 		new MenuItem('NGA-settings-item', '设置 - 扩展设置', '扩展设置', () => {
 			popup.show()
-		})
+		}),
+		new MenuItem('NGA-settings-item-toggle', '设置 - 切换隐藏帖子', '切换隐藏帖子（隐藏中）', (() => {
+			let hiding = true
+			return (e) => {
+				const self = e.target as HTMLAnchorElement
+				if (hiding) {
+					self.innerText = '切换隐藏帖子（显示中）'
+					PostLike.hiddenPosts.forEach(post => post.show())
+				} else {
+					self.innerText = '切换隐藏帖子（隐藏中）'
+					PostLike.hiddenPosts.forEach(post => post.hide())
+				}
+				hiding = !hiding
+			}
+		})()),
 	] as const
 	(async function insertMenuItems() {
 		await waitForElement('pagebtop')
@@ -29,4 +39,8 @@ function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 	})()
 	const processedElements = new WeakSet<HTMLElement>()
 	inject(processedElements, config)
+	const observer = new MutationObserver(() => {
+		inject(processedElements, config)
+	})
+	observer.observe(document.body, { childList: true, subtree: true })
 })()

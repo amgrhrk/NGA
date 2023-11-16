@@ -231,9 +231,10 @@ class MenuItem {
 		if (!vanillaSettingsItem) {
 			return
 		}
+		const menu = vanillaSettingsItem.parentElement!.parentElement!
 		const menuItem = this.template.content.firstElementChild!.cloneNode(true) as HTMLDivElement
 		menuItem.firstElementChild!.addEventListener('click', this.clickHandler)
-		vanillaSettingsItem.parentElement!.insertAdjacentElement('afterend', menuItem)
+		menu.appendChild(menuItem)
 	}
 
 	init() {

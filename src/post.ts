@@ -60,7 +60,7 @@ class Post extends PostLike {
 	private _prestige: number | null
 	private _fame: number | null
 	private _content: HTMLElement | null
-	private _quote: Quote | null
+	private _quote: Quote[] | null
 
 	/** @deprecated Use Post.from() instead */
 	constructor(element: Post['element']) {
@@ -102,9 +102,14 @@ class Post extends PostLike {
 	get quote() {
 		if (!this._quote) {
 			const content = this.content!
-			const quote = content.querySelector<HTMLElement>(Quote.selector)
-			if (quote) {
-				this._quote = Quote.from(quote)
+			const quotes = content.querySelectorAll<HTMLElement>(Quote.selector)
+			for (const quote of quotes) {
+				if (quote.children[0]?.tagName === 'A') {
+					if (!this._quote) {
+						this._quote = []
+					}
+					this._quote.push(Quote.from(quote))
+				}
 			}
 		}
 		return this._quote
@@ -160,10 +165,6 @@ class Post extends PostLike {
 		return this._fame
 	}
 
-	hide() {
-		this.element.style.display = 'none'
-	}
-
 	process(config: Config) {
 		if (config.userBlockList.has(this.uid) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
 			this.hide()
@@ -176,18 +177,18 @@ class Post extends PostLike {
 			}
 		}
 		if (config.translate) {
-			translateChildTextNodes(this.content!, this.quote?.element)
+			translateChildTextNodes(this.content!)
+			const collapseButtons = this.content!.querySelectorAll<HTMLButtonElement>('button[name=collapseSwitchButton]')
+			for (const button of collapseButtons) {
+				button.addEventListener('click', () => {
+					const collapseContent = button.parentElement!.nextElementSibling
+					if (collapseContent && collapseContent.classList.contains('collapse_content')) {
+						translateChildTextNodes(collapseContent)
+					}
+				}, { once: true })
+			}
 		}
-		const collapseButton = this._content!.querySelector('button[name=collapseSwitchButton]')
-		if (collapseButton) {
-			collapseButton.addEventListener('click', () => {
-				const collapseContent = this.content!.querySelector<HTMLElement>('.collapse_content')
-				if (collapseContent && config.translate) {
-					translateChildTextNodes(collapseContent)
-				}
-			}, { once: true })
-		}
-		this.quote?.process(config)
+		this.quote?.forEach(quote => quote.process(config))
 		this.addBlockButton(config)
 		this.resizeImages(config)
 	}
@@ -236,6 +237,35 @@ class Post extends PostLike {
 				image.addEventListener('load', () => {
 					image.style.maxWidth = '300px'
 				})
+			}
+		}
+	}
+
+	static processTitleAndNav(processedElements: WeakSet<HTMLElement>, config: Config) {
+		if (!config.translate) {
+			return
+		}
+		{
+			const title = document.getElementById('postsubject0')
+			if (title && !processedElements.has(title)) {
+				translateChildTextNodes(title)
+				processedElements.add(title)
+			}
+		}
+		{
+			const topNavButtons = document.querySelectorAll<HTMLAnchorElement>('#m_nav .nav_link')
+			const title = topNavButtons[topNavButtons.length - 1]
+			if (title && !processedElements.has(title)) {
+				translateChildTextNodes(title)
+				processedElements.add(title)
+			}
+		}
+		{
+			const bottomNavButtons = document.querySelectorAll<HTMLAnchorElement>('#b_nav .nav_link')
+			const title = bottomNavButtons[bottomNavButtons.length - 1]
+			if (title && !processedElements.has(title)) {
+				translateChildTextNodes(title)
+				processedElements.add(title)
 			}
 		}
 	}

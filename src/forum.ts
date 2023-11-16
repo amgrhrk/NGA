@@ -8,6 +8,8 @@ abstract class PostLike {
 
 	abstract get uid(): number
 
+	static hiddenPosts: Set<PostLike> = new Set()
+
 	protected static _from<T extends PostLike>(element: T['element'], _class: Class<T>, pool: WeakMap<T['element'], T>) {
 		const postLike = pool.get(element)
 		if (postLike) {
@@ -32,5 +34,15 @@ abstract class PostLike {
 				}
 			}
 		}
+	}
+
+	hide() {
+		PostLike.hiddenPosts.add(this)
+		this.element.style.display = 'none'
+	}
+
+	show() {
+		PostLike.hiddenPosts.add(this)
+		this.element.style.display = 'none'
 	}
 }

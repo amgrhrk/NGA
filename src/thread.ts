@@ -40,10 +40,6 @@ class Thread extends PostLike {
 		return this._sub
 	}
 
-	hide() {
-		this.element.style.display = 'none'
-	}
-
 	process(config: Config) {
 		if (config.userBlockList.has(this.uid) || (this.sub && config.subBlockList.has(this.sub)) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
 			this.hide()
