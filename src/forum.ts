@@ -43,6 +43,6 @@ abstract class PostLike {
 
 	show() {
 		PostLike.hiddenPosts.add(this)
-		this.element.style.display = 'none'
+		this.element.style.display = ''
 	}
 }

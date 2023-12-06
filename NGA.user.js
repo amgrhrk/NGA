@@ -311,7 +311,7 @@ class PostLike {
     }
     show() {
         PostLike.hiddenPosts.add(this);
-        this.element.style.display = 'none';
+        this.element.style.display = '';
     }
 }
 PostLike.hiddenPosts = new Set();
@@ -546,6 +546,14 @@ class Post extends PostLike {
         this.quote?.forEach(quote => quote.process(config));
         this.addBlockButton(config);
         this.resizeImages(config);
+        this.addLinkHandler();
+    }
+    addLinkHandler() {
+        const link = this.content?.querySelector('.urlincontent');
+        link?.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.open(link.href, '_blank', 'noreferrer');
+        });
     }
     addBlockButton(config) {
         const button = document.createElement('a');

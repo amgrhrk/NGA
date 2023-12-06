@@ -191,6 +191,15 @@ class Post extends PostLike {
 		this.quote?.forEach(quote => quote.process(config))
 		this.addBlockButton(config)
 		this.resizeImages(config)
+		this.addLinkHandler()
+	}
+
+	private addLinkHandler() {
+		const link = this.content?.querySelector<HTMLAnchorElement>('.urlincontent')
+		link?.addEventListener('click', (e) => {
+			e.preventDefault()
+			window.open(link.href, '_blank', 'noreferrer')
+		})
 	}
 
 	private addBlockButton(config: Config) {
