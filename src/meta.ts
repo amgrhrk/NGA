@@ -13,7 +13,6 @@
 // @grant        GM_addStyle
 // @grant        GM_getResourceText
 // @require      https://cdn.jsdelivr.net/gh/amgrhrk/NGA/src/translate.js
-// @resource     list https://raw.githubusercontent.com/amgrhrk/NGA/main/list.json
 // @run-at       document-body
 // ==/UserScript==
 

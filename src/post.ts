@@ -32,7 +32,7 @@ class Quote extends PostLike {
 	}
 
 	process(config: Config) {
-		if (config.userBlockList.has(this.uid) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
+		if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
 			this.hide()
 			return
 		}
@@ -166,7 +166,7 @@ class Post extends PostLike {
 	}
 
 	process(config: Config) {
-		if (config.userBlockList.has(this.uid) || (config.cloudList.enabled && config.cloudList.has(this.uid))) {
+		if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
 			this.hide()
 			return
 		}
