@@ -1,17 +1,7 @@
 function translateChildTextNodes(node: Node, exclude?: Node | null) {
-	const stack = [node]
-	while (stack.length > 0) {
-		const top = stack.pop()!
-		if (top === exclude) {
-			continue
-		}
-		if (top.hasChildNodes()) {
-			stack.push(...top.childNodes)
-			continue
-		}
-		if (top.nodeType === Node.TEXT_NODE && top.textContent) {
-			top.textContent = translate(top.textContent)
-		}
+	const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, node => node === exclude ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT)
+	while (walker.nextNode()) {
+		walker.currentNode.textContent = translate(walker.currentNode.textContent!)
 	}
 }
 

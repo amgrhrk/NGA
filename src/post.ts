@@ -20,9 +20,14 @@ class Quote extends PostLike {
 
 	get uid() {
 		if (this._uid == null) {
-			const user = this.element.querySelector<HTMLAnchorElement>('a.b')!
-			const match = user.href.match(/uid=(.+$)/)!
-			this._uid = Number.parseInt(match[1])
+			const user = this.element.querySelector<HTMLAnchorElement>('a.b')
+			if (!user) {
+				// Anonymous
+				this._uid = -1
+			} else {
+				const match = user.href.match(/uid=(.+$)/)!
+				this._uid = Number.parseInt(match[1])
+			}
 		}
 		return this._uid
 	}
@@ -192,14 +197,34 @@ class Post extends PostLike {
 		this.addBlockButton(config)
 		this.resizeImages(config)
 		this.addLinkHandler()
+		this.removeItalic()
+	}
+
+	private removeItalic() {
+		if (!this.content) {
+			return
+		}
+		const spans = this.content.querySelectorAll('span')
+		for (const span of spans) {
+			if (span.style.fontStyle === 'italic') {
+				span.style.removeProperty('font-style')
+			}
+			span.style.removeProperty('letter-spacing')
+		}
 	}
 
 	private addLinkHandler() {
-		const link = this.content?.querySelector<HTMLAnchorElement>('.urlincontent')
-		link?.addEventListener('click', (e) => {
-			e.preventDefault()
-			window.open(link.href, '_blank', 'noreferrer')
-		})
+		if (!this.content) {
+			return
+		}
+		const links = this.content.querySelectorAll<HTMLAnchorElement>('.urlincontent')
+		for (const link of links) {
+			const values = new Set(link.rel.split(/\s+/))
+			values.delete('')
+			values.add('noopener')
+			values.add('noreferrer')
+			link.rel = [...values].join(' ')
+		}
 	}
 
 	private addBlockButton(config: Config) {

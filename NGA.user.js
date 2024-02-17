@@ -203,19 +203,9 @@ class MenuItem {
     }
 }
 function translateChildTextNodes(node, exclude) {
-    const stack = [node];
-    while (stack.length > 0) {
-        const top = stack.pop();
-        if (top === exclude) {
-            continue;
-        }
-        if (top.hasChildNodes()) {
-            stack.push(...top.childNodes);
-            continue;
-        }
-        if (top.nodeType === Node.TEXT_NODE && top.textContent) {
-            top.textContent = translate(top.textContent);
-        }
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, node => node === exclude ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT);
+    while (walker.nextNode()) {
+        walker.currentNode.textContent = translate(walker.currentNode.textContent);
     }
 }
 function addClickEventListener(element, handler) {
@@ -371,8 +361,14 @@ class Quote extends PostLike {
     get uid() {
         if (this._uid == null) {
             const user = this.element.querySelector('a.b');
-            const match = user.href.match(/uid=(.+$)/);
-            this._uid = Number.parseInt(match[1]);
+            if (!user) {
+                // Anonymous
+                this._uid = -1;
+            }
+            else {
+                const match = user.href.match(/uid=(.+$)/);
+                this._uid = Number.parseInt(match[1]);
+            }
         }
         return this._uid;
     }
@@ -527,13 +523,32 @@ class Post extends PostLike {
         this.addBlockButton(config);
         this.resizeImages(config);
         this.addLinkHandler();
+        this.removeItalic();
+    }
+    removeItalic() {
+        if (!this.content) {
+            return;
+        }
+        const spans = this.content.querySelectorAll('span');
+        for (const span of spans) {
+            if (span.style.fontStyle === 'italic') {
+                span.style.removeProperty('font-style');
+            }
+            span.style.removeProperty('letter-spacing');
+        }
     }
     addLinkHandler() {
-        const link = this.content?.querySelector('.urlincontent');
-        link?.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.open(link.href, '_blank', 'noreferrer');
-        });
+        if (!this.content) {
+            return;
+        }
+        const links = this.content.querySelectorAll('.urlincontent');
+        for (const link of links) {
+            const values = new Set(link.rel.split(/\s+/));
+            values.delete('');
+            values.add('noopener');
+            values.add('noreferrer');
+            link.rel = [...values].join(' ');
+        }
     }
     addBlockButton(config) {
         const button = document.createElement('a');
