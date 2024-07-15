@@ -24,8 +24,12 @@ class Thread extends PostLike {
 
 	get uid() {
 		if (this._uid == null) {
-			const url = this.element.querySelector<HTMLAnchorElement>('a[class=author]')!
-			this._uid = Number.parseInt(new URL(url.href).searchParams.get('uid')!)
+			const url = this.element.querySelector<HTMLAnchorElement>('.author')!
+			if (url) {
+				this._uid = Number.parseInt(new URL(url.href).searchParams.get('uid')!)
+			} else {
+				this._uid = -1
+			}
 		}
 		return this._uid
 	}
@@ -50,6 +54,7 @@ class Thread extends PostLike {
 			title.innerText = translate(title.innerText)
 		}
 		this.addBlockButton(config)
+		this.removeReferrer()
 	}
 
 	addBlockButton(config: Config) {
@@ -68,5 +73,10 @@ class Thread extends PostLike {
 		})
 		const url = this.element.querySelector<HTMLAnchorElement>('a[class=author]')!
 		url.insertAdjacentElement('afterend', button)
+	}
+
+	removeReferrer() {
+		// #b_nav a, #m_pbtnbtm a, #m_pbtntop a, #m_nav a
+		Thread.removeReferrer(this.element.querySelectorAll<HTMLAnchorElement>('a.topic, a.silver'))
 	}
 }

@@ -88,11 +88,12 @@ class Post extends PostLike {
 
 	get uid() {
 		if (this._uid == null) {
-			const uidElement = this.element.querySelector<HTMLAnchorElement>('a[name=uid]')
-			if (!uidElement) {
+			const url = this.element.querySelector<HTMLAnchorElement>('.author')!
+			const uid = Number.parseInt(new URL(url.href).searchParams.get('uid')!)
+			if (Number.isNaN(uid)) {
 				throw new UidElementNotFoundError()
 			}
-			this._uid = Number.parseInt(uidElement.innerText)
+			this._uid = uid
 		}
 		return this._uid
 	}
@@ -170,7 +171,7 @@ class Post extends PostLike {
 		return this._fame
 	}
 
-	process(config: Config) {
+	async process(config: Config) {
 		if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
 			this.hide()
 			return
@@ -194,10 +195,10 @@ class Post extends PostLike {
 			}
 		}
 		this.quote?.forEach(quote => quote.process(config))
-		this.addBlockButton(config)
+		await this.addBlockButton(config)
 		this.resizeImages(config)
-		this.addLinkHandler()
 		this.removeItalic()
+		this.removeReferrer()
 	}
 
 	private removeItalic() {
@@ -213,21 +214,7 @@ class Post extends PostLike {
 		}
 	}
 
-	private addLinkHandler() {
-		if (!this.content) {
-			return
-		}
-		const links = this.content.querySelectorAll<HTMLAnchorElement>('.urlincontent')
-		for (const link of links) {
-			const values = new Set(link.rel.split(/\s+/))
-			values.delete('')
-			values.add('noopener')
-			values.add('noreferrer')
-			link.rel = [...values].join(' ')
-		}
-	}
-
-	private addBlockButton(config: Config) {
+	private async addBlockButton(config: Config) {
 		const button = document.createElement('a')
 		button.href = 'javascript:void(0)'
 		button.innerText = '屏蔽'
@@ -240,7 +227,7 @@ class Post extends PostLike {
 			config.userBlockList.add(this.uid)
 			config.save()
 		})
-		const uidElement = this.element.querySelector<HTMLAnchorElement>('a[name=uid]')!
+		const uidElement = await waitForSelector<HTMLAnchorElement>('a[name=uid]', this.element)
 		uidElement.insertAdjacentElement('afterend', button)
 	}
 
@@ -261,6 +248,7 @@ class Post extends PostLike {
 			}
 			delete image.dataset.srclazy
 			delete image.dataset.srcorg
+			delete image.dataset.usethumb
 			if (!config.showOriginalImage && modified) {
 				image.src = image.src + '.thumb.jpg'
 				image.removeAttribute('style')
@@ -301,6 +289,12 @@ class Post extends PostLike {
 				translateChildTextNodes(title)
 				processedElements.add(title)
 			}
+		}
+	}
+
+	removeReferrer() {
+		if (this.content) {
+			Post.removeReferrer(this.content.querySelectorAll('a'))
 		}
 	}
 }

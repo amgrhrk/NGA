@@ -1,7 +1,7 @@
 function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 	const popup = document.querySelector<HTMLDivElement>('.commonwindow')
 	if (popup && popup.innerText === '\u200b\n访客不能直接访问\n\n你可能需要 [登录] 后访问...\n\n[后退]') {
-		location.reload()
+		return location.reload()
 	} else if (location.pathname === '/thread.php') {
 		Thread.forEach(thread => thread.process(config), processedElements, config)
 	} else if (location.pathname === '/read.php') {
@@ -42,5 +42,5 @@ function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 	const observer = new MutationObserver(() => {
 		inject(processedElements, config)
 	})
-	observer.observe(document.body, { childList: true, subtree: true })
+	observer.observe(document, { childList: true, subtree: true })
 })()

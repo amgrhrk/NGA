@@ -13,7 +13,7 @@
 // @grant        GM_addStyle
 // @grant        GM_getResourceText
 // @require      https://cdn.jsdelivr.net/gh/amgrhrk/NGA/src/translate.js
-// @run-at       document-body
+// @run-at       document-start
 // ==/UserScript==
 
 declare function GM_setValue(name: string, value: any): void

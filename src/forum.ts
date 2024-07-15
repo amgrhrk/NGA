@@ -36,6 +36,17 @@ abstract class PostLike {
 		}
 	}
 
+	protected static removeReferrer(urls: Iterable<HTMLAnchorElement>) {
+		for (const url of urls) {
+			url.target = '_blank'
+			const values = new Set(url.rel.split(/\s+/))
+			values.delete('')
+			values.add('noopener')
+			values.add('noreferrer')
+			url.rel = [...values].join(' ')
+		}
+	}
+
 	hide() {
 		PostLike.hiddenPosts.add(this)
 		this.element.style.display = 'none'

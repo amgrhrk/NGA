@@ -28,25 +28,25 @@ async function waitForElement(id: string) {
 				observer.disconnect()
 			}
 		})
-		observer.observe(document.body, { childList: true, subtree: true })
+		observer.observe(document, { childList: true, subtree: true, attributes: true })
 	})
 }
 
 async function waitForSelector<K extends keyof HTMLElementTagNameMap>(selectors: K, parent?: HTMLElement): Promise<HTMLElementTagNameMap[K]>
 async function waitForSelector<E extends HTMLElement = HTMLElement>(selectors: string, parent?: HTMLElement): Promise<HTMLElement>
 async function waitForSelector(selectors: string, parent?: HTMLElement) {
-	const element = parent ? parent.querySelector(selectors) : document.querySelector(selectors)
+	const element = parent ? parent.querySelector<HTMLElement>(selectors) : document.querySelector<HTMLElement>(selectors)
 	if (element) {
-		return element as HTMLElement
+		return element
 	}
 	return new Promise<HTMLElement>((resolve, reject) => {
 		const observer = new MutationObserver(mutations => {
-			const element = parent ? parent.querySelector(selectors) : document.querySelector(selectors)
+			const element = parent ? parent.querySelector<HTMLElement>(selectors) : document.querySelector<HTMLElement>(selectors)
 			if (element) {
-				resolve(element as HTMLElement)
+				resolve(element)
 				observer.disconnect()
 			}
 		})
-		observer.observe(parent ? parent : document.body, { childList: true, subtree: true })
+		observer.observe(parent ? parent : document, { childList: true, subtree: true, attributes: true })
 	})
 }
