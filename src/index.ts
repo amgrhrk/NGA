@@ -1,7 +1,12 @@
 function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 	const popup = document.querySelector<HTMLDivElement>('.commonwindow')
 	if (popup && popup.innerText === '\u200b\n访客不能直接访问\n\n你可能需要 [登录] 后访问...\n\n[后退]') {
-		return location.reload()
+		location.reload()
+	} else if (document.body?.childNodes[0].textContent === '(ERROR:') {
+		const redirectLink = document.querySelector('a')
+		if (redirectLink && redirectLink.innerText === '如不能自动跳转 可点此链接') {
+			// redirectLink.click()
+		}
 	} else if (location.pathname === '/thread.php') {
 		Thread.forEach(thread => thread.process(config), processedElements, config)
 	} else if (location.pathname === '/read.php') {
@@ -34,7 +39,7 @@ function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 		})()),
 	] as const
 	(async function insertMenuItems() {
-		await waitForElement('pagebtop')
+		await waitForSelector('#mainmenu .right > .td > a')
 		menuItems.forEach(item => item.init())
 	})()
 	const processedElements = new WeakSet<HTMLElement>()

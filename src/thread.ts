@@ -54,7 +54,7 @@ class Thread extends PostLike {
 			title.innerText = translate(title.innerText)
 		}
 		this.addBlockButton(config)
-		this.removeReferrer()
+		// this.removeReferrer()
 	}
 
 	addBlockButton(config: Config) {

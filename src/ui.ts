@@ -176,6 +176,10 @@ GM_addStyle(css`
 		display: flex;
 		justify-content: end;
 	}
+
+	body {
+		font-size: 15px !important;
+	}
 `)
 
 class MenuItem {
@@ -212,13 +216,13 @@ class MenuItem {
 		menu.appendChild(menuItem)
 	}
 
-	init() {
+	async init() {
 		if (this.initialized) {
 			return
 		}
 		const navButtons = document.querySelectorAll('#mainmenu .right > .td > a')
 		const startButton = navButtons[0]
-		const messageButton = navButtons[3]
+		const messageButton = navButtons[2]
 		for (const button of [startButton, messageButton]) {
 			button.addEventListener('click', () => this.navButtonOnClickHandler())
 		}

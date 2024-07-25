@@ -161,6 +161,10 @@ GM_addStyle(css `
 		display: flex;
 		justify-content: end;
 	}
+
+	body {
+		font-size: 15px !important;
+	}
 `);
 class MenuItem {
     constructor(id, title, text, onClick) {
@@ -189,13 +193,13 @@ class MenuItem {
         menuItem.firstElementChild.addEventListener('click', this.clickHandler);
         menu.appendChild(menuItem);
     }
-    init() {
+    async init() {
         if (this.initialized) {
             return;
         }
         const navButtons = document.querySelectorAll('#mainmenu .right > .td > a');
         const startButton = navButtons[0];
-        const messageButton = navButtons[3];
+        const messageButton = navButtons[2];
         for (const button of [startButton, messageButton]) {
             button.addEventListener('click', () => this.navButtonOnClickHandler());
         }
@@ -340,7 +344,7 @@ class Thread extends PostLike {
             title.innerText = translate(title.innerText);
         }
         this.addBlockButton(config);
-        this.removeReferrer();
+        // this.removeReferrer()
     }
     addBlockButton(config) {
         const button = document.createElement('a');
@@ -601,7 +605,7 @@ class Post extends PostLike {
             if (document.title.includes('安科')) {
                 image.removeAttribute('style');
                 image.addEventListener('load', () => {
-                    image.style.maxWidth = '300px';
+                    image.style.maxWidth = '150px';
                 });
             }
         }
@@ -645,7 +649,13 @@ Post.selector = '#m_posts_c > .postbox';
 function inject(processedElements, config) {
     const popup = document.querySelector('.commonwindow');
     if (popup && popup.innerText === '\u200b\n访客不能直接访问\n\n你可能需要 [登录] 后访问...\n\n[后退]') {
-        return location.reload();
+        location.reload();
+    }
+    else if (document.body?.childNodes[0].textContent === '(ERROR:') {
+        const redirectLink = document.querySelector('a');
+        if (redirectLink && redirectLink.innerText === '如不能自动跳转 可点此链接') {
+            // redirectLink.click()
+        }
     }
     else if (location.pathname === '/thread.php') {
         Thread.forEach(thread => thread.process(config), processedElements, config);
@@ -680,7 +690,7 @@ function inject(processedElements, config) {
         })()),
     ];
     (async function insertMenuItems() {
-        await waitForElement('pagebtop');
+        await waitForSelector('#mainmenu .right > .td > a');
         menuItems.forEach(item => item.init());
     })();
     const processedElements = new WeakSet();

@@ -257,7 +257,7 @@ class Post extends PostLike {
 			if (document.title.includes('安科')) {
 				image.removeAttribute('style')
 				image.addEventListener('load', () => {
-					image.style.maxWidth = '300px'
+					image.style.maxWidth = '150px'
 				})
 			}
 		}
