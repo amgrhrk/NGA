@@ -21,14 +21,14 @@ async function waitForElement(id: string) {
 		return element
 	}
 	return new Promise<HTMLElement>((resolve, reject) => {
-		const observer = new MutationObserver(mutations => {
+		const observer = new MutationObserver(() => {
 			const element = document.getElementById(id)
 			if (element) {
-				resolve(element)
 				observer.disconnect()
+				resolve(element)
 			}
 		})
-		observer.observe(document, { childList: true, subtree: true, attributes: true })
+		observer.observe(document.body, { childList: true, subtree: true })
 	})
 }
 
@@ -40,13 +40,28 @@ async function waitForSelector(selectors: string, parent?: HTMLElement) {
 		return element
 	}
 	return new Promise<HTMLElement>((resolve, reject) => {
-		const observer = new MutationObserver(mutations => {
+		const observer = new MutationObserver(() => {
 			const element = parent ? parent.querySelector<HTMLElement>(selectors) : document.querySelector<HTMLElement>(selectors)
 			if (element) {
-				resolve(element)
 				observer.disconnect()
+				resolve(element)
 			}
 		})
-		observer.observe(parent ? parent : document, { childList: true, subtree: true, attributes: true })
+		observer.observe(parent ? parent : document.body, { childList: true, subtree: true })
+	})
+}
+
+async function waitForBody() {
+	if (document.body) {
+		return document.body
+	}
+	return new Promise<HTMLElement>((resolve, reject) => {
+		const observer = new MutationObserver(() => {
+			if (document.body) {
+				observer.disconnect()
+				resolve(document.body)
+			}
+		})
+		observer.observe(document, { childList: true, subtree: true })
 	})
 }

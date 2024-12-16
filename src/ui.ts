@@ -107,7 +107,7 @@ class Popup {
 		cancelButton.addEventListener('click', () => {
 			this.hide()
 		})
-		waitForSelector('body').then(() => document.body.appendChild(this.container))
+		document.body.appendChild(this.container)
 	}
 
 	show() {

@@ -10,6 +10,8 @@ abstract class PostLike {
 
 	static hiddenPosts: Set<PostLike> = new Set()
 
+	static hiding = true
+
 	protected static _from<T extends PostLike>(element: T['element'], _class: Class<T>, pool: WeakMap<T['element'], T>) {
 		const postLike = pool.get(element)
 		if (postLike) {
@@ -28,9 +30,7 @@ abstract class PostLike {
 					callback(PostLike._from(element, _class, pool), config)
 					processedElements.add(element)
 				} catch (err) {
-					if (!(err instanceof UidElementNotFoundError)) {
-						log(err)
-					}
+					log(err)
 				}
 			}
 		}
@@ -49,11 +49,26 @@ abstract class PostLike {
 
 	hide() {
 		PostLike.hiddenPosts.add(this)
-		this.element.style.display = 'none'
+		if (PostLike.hiding) {
+			this.element.style.display = 'none'
+		}
 	}
 
 	show() {
-		PostLike.hiddenPosts.add(this)
 		this.element.style.display = ''
+	}
+
+	static hideAll() {
+		PostLike.hiding = true
+		for (const postLike of PostLike.hiddenPosts) {
+			postLike.hide()
+		}
+	}
+
+	static showAll() {
+		PostLike.hiding = false
+		for (const postLike of PostLike.hiddenPosts) {
+			postLike.show()
+		}
 	}
 }

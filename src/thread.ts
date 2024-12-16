@@ -47,31 +47,29 @@ class Thread extends PostLike {
 	process(config: Config) {
 		if (config.userBlockList.has(this.uid) || (this.sub && config.subBlockList.has(this.sub)) || config.builtinList.has(this.uid)) {
 			this.hide()
-			return
 		}
 		const title = this.element.querySelector<HTMLElement>('.topic')
 		if (title && config.translate) {
 			title.innerText = translate(title.innerText)
 		}
 		this.addBlockButton(config)
-		// this.removeReferrer()
 	}
 
-	addBlockButton(config: Config) {
+	async addBlockButton(config: Config) {
 		const button = document.createElement('a')
 		button.href = 'javascript:void(0)'
 		button.innerText = '屏蔽'
 		button.style.marginLeft = '8px'
 		button.addEventListener('click', () => {
 			if (this.uid <= 0 || Number.isNaN(this.uid)) {
-				log(this.uid)
+				log('Thread.addBlockButton', this.uid)
 				return
 			}
 			this.hide()
 			config.userBlockList.add(this.uid)
 			config.save()
 		})
-		const url = this.element.querySelector<HTMLAnchorElement>('a[class=author]')!
+		const url = await waitForSelector('a.author',this.element)
 		url.insertAdjacentElement('afterend', button)
 	}
 

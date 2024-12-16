@@ -75,7 +75,7 @@ class Popup {
         cancelButton.addEventListener('click', () => {
             this.hide();
         });
-        waitForSelector('body').then(() => document.body.appendChild(this.container));
+        document.body.appendChild(this.container);
     }
     show() {
         this.reset();
@@ -227,14 +227,14 @@ async function waitForElement(id) {
         return element;
     }
     return new Promise((resolve, reject) => {
-        const observer = new MutationObserver(mutations => {
+        const observer = new MutationObserver(() => {
             const element = document.getElementById(id);
             if (element) {
-                resolve(element);
                 observer.disconnect();
+                resolve(element);
             }
         });
-        observer.observe(document, { childList: true, subtree: true, attributes: true });
+        observer.observe(document.body, { childList: true, subtree: true });
     });
 }
 async function waitForSelector(selectors, parent) {
@@ -243,14 +243,28 @@ async function waitForSelector(selectors, parent) {
         return element;
     }
     return new Promise((resolve, reject) => {
-        const observer = new MutationObserver(mutations => {
+        const observer = new MutationObserver(() => {
             const element = parent ? parent.querySelector(selectors) : document.querySelector(selectors);
             if (element) {
-                resolve(element);
                 observer.disconnect();
+                resolve(element);
             }
         });
-        observer.observe(parent ? parent : document, { childList: true, subtree: true, attributes: true });
+        observer.observe(parent ? parent : document.body, { childList: true, subtree: true });
+    });
+}
+async function waitForBody() {
+    if (document.body) {
+        return document.body;
+    }
+    return new Promise((resolve, reject) => {
+        const observer = new MutationObserver(() => {
+            if (document.body) {
+                observer.disconnect();
+                resolve(document.body);
+            }
+        });
+        observer.observe(document, { childList: true, subtree: true });
     });
 }
 class PostLike {
@@ -272,9 +286,7 @@ class PostLike {
                     processedElements.add(element);
                 }
                 catch (err) {
-                    if (!(err instanceof UidElementNotFoundError)) {
-                        log(err);
-                    }
+                    log(err);
                 }
             }
         }
@@ -291,14 +303,28 @@ class PostLike {
     }
     hide() {
         PostLike.hiddenPosts.add(this);
-        this.element.style.display = 'none';
+        if (PostLike.hiding) {
+            this.element.style.display = 'none';
+        }
     }
     show() {
-        PostLike.hiddenPosts.add(this);
         this.element.style.display = '';
+    }
+    static hideAll() {
+        PostLike.hiding = true;
+        for (const postLike of PostLike.hiddenPosts) {
+            postLike.hide();
+        }
+    }
+    static showAll() {
+        PostLike.hiding = false;
+        for (const postLike of PostLike.hiddenPosts) {
+            postLike.show();
+        }
     }
 }
 PostLike.hiddenPosts = new Set();
+PostLike.hiding = true;
 class Thread extends PostLike {
     /** @deprecated Use Thread.from() instead */
     constructor(element) {
@@ -337,30 +363,28 @@ class Thread extends PostLike {
     process(config) {
         if (config.userBlockList.has(this.uid) || (this.sub && config.subBlockList.has(this.sub)) || config.builtinList.has(this.uid)) {
             this.hide();
-            return;
         }
         const title = this.element.querySelector('.topic');
         if (title && config.translate) {
             title.innerText = translate(title.innerText);
         }
         this.addBlockButton(config);
-        // this.removeReferrer()
     }
-    addBlockButton(config) {
+    async addBlockButton(config) {
         const button = document.createElement('a');
         button.href = 'javascript:void(0)';
         button.innerText = '屏蔽';
         button.style.marginLeft = '8px';
         button.addEventListener('click', () => {
             if (this.uid <= 0 || Number.isNaN(this.uid)) {
-                log(this.uid);
+                log('Thread.addBlockButton', this.uid);
                 return;
             }
             this.hide();
             config.userBlockList.add(this.uid);
             config.save();
         });
-        const url = this.element.querySelector('a[class=author]');
+        const url = await waitForSelector('a.author', this.element);
         url.insertAdjacentElement('afterend', button);
     }
     removeReferrer() {
@@ -370,8 +394,6 @@ class Thread extends PostLike {
 }
 Thread.pool = new WeakMap();
 Thread.selector = '#topicrows > tbody';
-class UidElementNotFoundError extends TypeError {
-}
 class Quote extends PostLike {
     /** @deprecated Use Quote.from() instead */
     constructor(element) {
@@ -396,13 +418,9 @@ class Quote extends PostLike {
         }
         return this._uid;
     }
-    hide() {
-        this.element.style.display = 'none';
-    }
     process(config) {
         if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
             this.hide();
-            return;
         }
         if (config.translate) {
             translateChildTextNodes(this.element);
@@ -441,10 +459,7 @@ class Post extends PostLike {
         if (this._uid == null) {
             const url = this.element.querySelector('.author');
             const uid = Number.parseInt(new URL(url.href).searchParams.get('uid'));
-            if (Number.isNaN(uid)) {
-                throw new UidElementNotFoundError();
-            }
-            this._uid = uid;
+            this._uid = (Number.isNaN(uid) ? -1 : uid);
         }
         return this._uid;
     }
@@ -524,12 +539,10 @@ class Post extends PostLike {
     async process(config) {
         if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
             this.hide();
-            return;
         }
         if (config.minPrestige != null || config.minPrestige != null) {
             if (this.prestige < config.minPrestige || this.fame < config.minPrestige) {
                 this.hide();
-                return;
             }
         }
         if (config.translate) {
@@ -568,7 +581,7 @@ class Post extends PostLike {
         button.innerText = '屏蔽';
         button.addEventListener('click', () => {
             if (this.uid <= 0 || Number.isNaN(this.uid)) {
-                log(this.uid);
+                log('Post.addBlockButton', this.uid);
                 return;
             }
             this.hide();
@@ -640,7 +653,8 @@ class Post extends PostLike {
     }
     removeReferrer() {
         if (this.content) {
-            Post.removeReferrer(this.content.querySelectorAll('a'));
+            Post.removeReferrer([...this.content.querySelectorAll('a')]
+                .filter(a => !a.parentElement?.classList.contains('lessernuke')));
         }
     }
 }
@@ -650,12 +664,11 @@ function inject(processedElements, config) {
     const popup = document.querySelector('.commonwindow');
     if (popup && popup.innerText === '\u200b\n访客不能直接访问\n\n你可能需要 [登录] 后访问...\n\n[后退]') {
         location.reload();
-    }
-    else if (document.body?.childNodes[0].textContent === '(ERROR:') {
-        const redirectLink = document.querySelector('a');
-        if (redirectLink && redirectLink.innerText === '如不能自动跳转 可点此链接') {
-            // redirectLink.click()
-        }
+        // } else if (document.body.childNodes[0].textContent === '(ERROR:') {
+        // 	const redirectLink = document.querySelector('a')
+        // 	if (redirectLink && redirectLink.innerText === '如不能自动跳转 可点此链接') {
+        // 		// redirectLink.click()
+        // 	}
     }
     else if (location.pathname === '/thread.php') {
         Thread.forEach(thread => thread.process(config), processedElements, config);
@@ -666,6 +679,7 @@ function inject(processedElements, config) {
     }
 }
 (async function main() {
+    await waitForBody();
     const config = new Config();
     const popup = new Popup(config);
     config.onSave = () => popup.reset();
@@ -673,21 +687,17 @@ function inject(processedElements, config) {
         new MenuItem('NGA-settings-item', '设置 - 扩展设置', '扩展设置', () => {
             popup.show();
         }),
-        new MenuItem('NGA-settings-item-toggle', '设置 - 切换隐藏帖子', '切换隐藏帖子（隐藏中）', (() => {
-            let hiding = true;
-            return (e) => {
-                const self = e.target;
-                if (hiding) {
-                    self.innerText = '切换隐藏帖子（显示中）';
-                    PostLike.hiddenPosts.forEach(post => post.show());
-                }
-                else {
-                    self.innerText = '切换隐藏帖子（隐藏中）';
-                    PostLike.hiddenPosts.forEach(post => post.hide());
-                }
-                hiding = !hiding;
-            };
-        })()),
+        new MenuItem('NGA-settings-item-toggle', '设置 - 切换隐藏帖子', PostLike.hiding ? '切换隐藏帖子（隐藏中）' : '切换隐藏帖子（显示中）', e => {
+            const self = e.target;
+            if (PostLike.hiding) {
+                self.innerText = '切换隐藏帖子（显示中）';
+                PostLike.showAll();
+            }
+            else {
+                self.innerText = '切换隐藏帖子（隐藏中）';
+                PostLike.hideAll();
+            }
+        }),
     ];
     (async function insertMenuItems() {
         await waitForSelector('#mainmenu .right > .td > a');
@@ -698,5 +708,5 @@ function inject(processedElements, config) {
     const observer = new MutationObserver(() => {
         inject(processedElements, config);
     });
-    observer.observe(document, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true });
 })();

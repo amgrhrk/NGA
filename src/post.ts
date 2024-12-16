@@ -1,5 +1,3 @@
-class UidElementNotFoundError extends TypeError {}
-
 class Quote extends PostLike {
 	private static readonly pool = new WeakMap<Quote['element'], Quote>()
 	static readonly selector = '.quote'
@@ -32,14 +30,9 @@ class Quote extends PostLike {
 		return this._uid
 	}
 
-	hide() {
-		this.element.style.display = 'none'
-	}
-
 	process(config: Config) {
 		if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
 			this.hide()
-			return
 		}
 		if (config.translate) {
 			translateChildTextNodes(this.element)
@@ -90,10 +83,7 @@ class Post extends PostLike {
 		if (this._uid == null) {
 			const url = this.element.querySelector<HTMLAnchorElement>('.author')!
 			const uid = Number.parseInt(new URL(url.href).searchParams.get('uid')!)
-			if (Number.isNaN(uid)) {
-				throw new UidElementNotFoundError()
-			}
-			this._uid = uid
+			this._uid = (Number.isNaN(uid) ? -1 : uid)
 		}
 		return this._uid
 	}
@@ -174,12 +164,10 @@ class Post extends PostLike {
 	async process(config: Config) {
 		if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
 			this.hide()
-			return
 		}
 		if (config.minPrestige != null || config.minPrestige != null) {
 			if (this.prestige < config.minPrestige || this.fame < config.minPrestige) {
 				this.hide()
-				return
 			}
 		}
 		if (config.translate) {
@@ -220,7 +208,7 @@ class Post extends PostLike {
 		button.innerText = '屏蔽'
 		button.addEventListener('click', () => {
 			if (this.uid <= 0 || Number.isNaN(this.uid)) {
-				log(this.uid)
+				log('Post.addBlockButton', this.uid)
 				return
 			}
 			this.hide()
@@ -294,7 +282,9 @@ class Post extends PostLike {
 
 	removeReferrer() {
 		if (this.content) {
-			Post.removeReferrer(this.content.querySelectorAll('a'))
+			Post.removeReferrer([...this.content.querySelectorAll('a')]
+				.filter(a => !a.parentElement?.classList.contains('lessernuke'))
+			)
 		}
 	}
 }
