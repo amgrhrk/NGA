@@ -25,11 +25,7 @@ class Thread extends PostLike {
 	get uid() {
 		if (this._uid == null) {
 			const url = this.element.querySelector<HTMLAnchorElement>('.author')!
-			if (url) {
-				this._uid = Number.parseInt(new URL(url.href).searchParams.get('uid')!)
-			} else {
-				this._uid = -1
-			}
+			this._uid = Number.parseInt(new URL(url.href).searchParams.get('uid')!)
 		}
 		return this._uid
 	}
@@ -44,7 +40,8 @@ class Thread extends PostLike {
 		return this._sub
 	}
 
-	process(config: Config) {
+	async process(config: Config) {
+		const uidUrl = await waitForSelector<HTMLAnchorElement>('a.author', this.element)
 		if (config.userBlockList.has(this.uid) || (this.sub && config.subBlockList.has(this.sub)) || config.builtinList.has(this.uid)) {
 			this.hide()
 		}
@@ -52,15 +49,15 @@ class Thread extends PostLike {
 		if (title && config.translate) {
 			title.innerText = translate(title.innerText)
 		}
-		this.addBlockButton(config)
+		this.addBlockButton(config, uidUrl)
 	}
 
-	async addBlockButton(config: Config) {
+	async addBlockButton(config: Config, url: HTMLAnchorElement) {
 		const button = document.createElement('a')
 		button.href = 'javascript:void(0)'
 		button.innerText = '屏蔽'
 		button.style.marginLeft = '8px'
-		button.addEventListener('click', () => {
+		button.addEventListener('click', async () => {
 			if (this.uid <= 0 || Number.isNaN(this.uid)) {
 				log('Thread.addBlockButton', this.uid)
 				return
@@ -69,7 +66,6 @@ class Thread extends PostLike {
 			config.userBlockList.add(this.uid)
 			config.save()
 		})
-		const url = await waitForSelector('a.author',this.element)
 		url.insertAdjacentElement('afterend', button)
 	}
 

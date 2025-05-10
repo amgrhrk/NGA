@@ -30,7 +30,7 @@ class Quote extends PostLike {
 		return this._uid
 	}
 
-	process(config: Config) {
+	async process(config: Config) {
 		if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
 			this.hide()
 		}
@@ -162,6 +162,7 @@ class Post extends PostLike {
 	}
 
 	async process(config: Config) {
+		const uidElement = await waitForSelector<HTMLAnchorElement>('a[name=uid]', this.element)
 		if (config.userBlockList.has(this.uid) || config.builtinList.has(this.uid)) {
 			this.hide()
 		}
@@ -183,7 +184,7 @@ class Post extends PostLike {
 			}
 		}
 		this.quote?.forEach(quote => quote.process(config))
-		await this.addBlockButton(config)
+		this.addBlockButton(config, uidElement)
 		this.resizeImages(config)
 		this.removeItalic()
 		this.removeReferrer()
@@ -202,7 +203,7 @@ class Post extends PostLike {
 		}
 	}
 
-	private async addBlockButton(config: Config) {
+	private addBlockButton(config: Config, uidElement: HTMLAnchorElement) {
 		const button = document.createElement('a')
 		button.href = 'javascript:void(0)'
 		button.innerText = '屏蔽'
@@ -215,7 +216,6 @@ class Post extends PostLike {
 			config.userBlockList.add(this.uid)
 			config.save()
 		})
-		const uidElement = await waitForSelector<HTMLAnchorElement>('a[name=uid]', this.element)
 		uidElement.insertAdjacentElement('afterend', button)
 	}
 

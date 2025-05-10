@@ -36,8 +36,12 @@ function inject(processedElements: WeakSet<HTMLElement>, config: Config) {
 		}),
 	] as const
 	(async function insertMenuItems() {
-		await waitForSelector('#mainmenu .right > .td > a')
-		menuItems.forEach(item => item.init())
+		try {
+			await waitForSelector('#mainmenu .right > .td > a')
+			menuItems.forEach(item => item.init())
+		} catch (err) {
+			log(err)
+		}
 	})()
 	const processedElements = new WeakSet<HTMLElement>()
 	inject(processedElements, config)
